@@ -454,9 +454,9 @@ impl<'a> Kalshi {
         input_type: OrderType,
         buy_max_cost: Option<i64>,
         expiration_ts: Option<i64>,
+        yes_price: Option<i64>,
         no_price: Option<i64>,
         sell_position_floor: Option<i32>,
-        yes_price: Option<i64>,
         yes_price_dollars: Option<String>,
         no_price_dollars: Option<String>,
     ) -> Result<Order, KalshiError> {
@@ -1214,12 +1214,12 @@ pub struct OrderCreationField {
     pub buy_max_cost: Option<i64>,
     /// Expiration time of the order. Optional.
     pub expiration_ts: Option<i64>,
+    /// Price of the 'Yes' option in the order (in cents). Optional.
+    pub yes_price: Option<i64>,
     /// Price of the 'No' option in the order (in cents). Optional.
     pub no_price: Option<i64>,
     /// The minimum position the seller is willing to hold after selling. Optional.
     pub sell_position_floor: Option<i32>,
-    /// Price of the 'Yes' option in the order (in cents). Optional.
-    pub yes_price: Option<i64>,
     /// Price of the 'Yes' option in dollars (e.g., "0.5000"). Optional.
     pub yes_price_dollars: Option<String>,
     /// Price of the 'No' option in dollars (e.g., "0.5000"). Optional.
