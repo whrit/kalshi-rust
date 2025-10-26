@@ -459,22 +459,43 @@ impl<'a> Kalshi {
         no_price: Option<i64>,
         sell_position_floor: Option<i32>,
         yes_price: Option<i64>,
+        yes_price_dollars: Option<String>,
+        no_price_dollars: Option<String>,
     ) -> Result<Order, KalshiError> {
         match input_type {
-            OrderType::Limit => match (no_price, yes_price) {
-                (Some(_), Some(_)) => {
+            OrderType::Limit => {
+                // Check if user provided both cent and dollar prices for the same side
+                if yes_price.is_some() && yes_price_dollars.is_some() {
                     return Err(KalshiError::UserInputError(
-                        "Can only provide no_price exclusive or yes_price, can't provide both"
-                            .to_string(),
+                        "Cannot provide both yes_price and yes_price_dollars".to_string(),
                     ));
                 }
-                (None, None) => {
+                if no_price.is_some() && no_price_dollars.is_some() {
                     return Err(KalshiError::UserInputError(
-                            "Must provide either no_price exclusive or yes_price, can't provide neither"
-                                .to_string(),
-                        ));
+                        "Cannot provide both no_price and no_price_dollars".to_string(),
+                    ));
                 }
-                _ => {}
+                
+                // Check if any price is provided
+                let has_price = yes_price.is_some() 
+                    || no_price.is_some() 
+                    || yes_price_dollars.is_some() 
+                    || no_price_dollars.is_some();
+                
+                if !has_price {
+                    return Err(KalshiError::UserInputError(
+                        "Must provide a price (yes_price, no_price, yes_price_dollars, or no_price_dollars)".to_string(),
+                    ));
+                }
+                
+                // Check if both yes and no prices are provided
+                let has_yes = yes_price.is_some() || yes_price_dollars.is_some();
+                let has_no = no_price.is_some() || no_price_dollars.is_some();
+                if has_yes && has_no {
+                    return Err(KalshiError::UserInputError(
+                        "Can only provide yes price or no price, not both".to_string(),
+                    ));
+                }
             },
             _ => {}
         }
@@ -493,9 +514,11 @@ impl<'a> Kalshi {
             r#type: input_type,
             buy_max_cost: buy_max_cost,
             expiration_ts: expiration_ts,
+            yes_price: yes_price,
             no_price: no_price,
             sell_position_floor: sell_position_floor,
-            yes_price: yes_price,
+            yes_price_dollars: yes_price_dollars,
+            no_price_dollars: no_price_dollars,
         };
 
         let path = format!("{}/orders", PORTFOLIO_PATH);
@@ -533,9 +556,11 @@ impl<'a> Kalshi {
                     input_type,
                     buy_max_cost,
                     expiration_ts,
+                    yes_price,
                     no_price,
                     sell_position_floor,
-                    yes_price,
+                    yes_price_dollars,
+                    no_price_dollars,
                 ) = field.get_params();
 
                 CreateOrderPayload {
@@ -547,9 +572,11 @@ impl<'a> Kalshi {
                     r#type: input_type,
                     buy_max_cost,
                     expiration_ts,
+                    yes_price,
                     no_price,
                     sell_position_floor,
-                    yes_price,
+                    yes_price_dollars,
+                    no_price_dollars,
                 }
             })
             .collect();
@@ -690,9 +717,13 @@ struct CreateOrderPayload {
     r#type: OrderType,
     buy_max_cost: Option<i64>,
     expiration_ts: Option<i64>,
+    yes_price: Option<i64>,
     no_price: Option<i64>,
     sell_position_floor: Option<i32>,
-    yes_price: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    yes_price_dollars: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    no_price_dollars: Option<String>,
 }
 
 // PUBLIC STRUCTS
@@ -707,51 +738,106 @@ pub struct Order {
     /// Unique identifier for the order.
     pub order_id: String,
     /// Identifier of the user who placed the order. Optional.
+    #[serde(default)]
     pub user_id: Option<String>,
     /// Ticker of the market associated with the order.
     pub ticker: String,
     /// Current status of the order (e.g., resting, executed).
     pub status: OrderStatus,
-    /// Price of the 'Yes' option in the order.
+    /// Price of the 'Yes' option in the order (cents).
     pub yes_price: i32,
-    /// Price of the 'No' option in the order.
+    /// Price of the 'No' option in the order (cents).
     pub no_price: i32,
+
     /// Timestamp when the order was created. Optional.
+    #[serde(default)]
     pub created_time: Option<String>,
-    /// Count of fills where the order acted as a taker. Optional.
-    pub taker_fill_count: Option<i32>,
-    /// Total cost of taker fills. Optional.
-    pub taker_fill_cost: Option<i32>,
-    /// Count of order placements. Optional.
-    pub place_count: Option<i32>,
-    /// Count of order decreases. Optional.
-    pub decrease_count: Option<i32>,
-    /// Count of fills where the order acted as a maker. Optional.
-    pub maker_fill_count: Option<i32>,
-    /// Count of FCC (Financial Crime Compliance) cancellations. Optional.
-    pub fcc_cancel_count: Option<i32>,
-    /// Count of cancellations at market close. Optional.
-    pub close_cancel_count: Option<i32>,
+    /// Last update time of the order. Optional.
+    #[serde(default)]
+    pub last_update_time: Option<String>,
+    /// Expiration time of the order. Optional (often null).
+    #[serde(default)]
+    pub expiration_time: Option<String>,
+
+    // === Counts / queue ===
+    /// Total fills (Kalshi now reports a single `fill_count`).
+    #[serde(default)]
+    pub fill_count: Option<i32>,
+    /// Initial order size.
+    #[serde(default)]
+    pub initial_count: Option<i32>,
     /// Remaining count of the order. Optional.
+    #[serde(default)]
     pub remaining_count: Option<i32>,
     /// Position of the order in the queue. Optional.
+    #[serde(default)]
     pub queue_position: Option<i32>,
-    /// Expiration time of the order. Optional.
-    pub expiration_time: Option<String>,
-    /// Fees incurred as a taker. Optional.
+
+    // === Legacy/optional counters kept for back-compat (often missing) ===
+    #[serde(default)]
+    pub taker_fill_count: Option<i32>,
+    #[serde(default)]
+    pub place_count: Option<i32>,
+    #[serde(default)]
+    pub decrease_count: Option<i32>,
+    #[serde(default)]
+    pub maker_fill_count: Option<i32>,
+    #[serde(default)]
+    pub fcc_cancel_count: Option<i32>,
+    #[serde(default)]
+    pub close_cancel_count: Option<i32>,
+
+    // === Fees / costs ===
+    /// Fees incurred as a taker (cents).
+    #[serde(default)]
     pub taker_fees: Option<i32>,
-    /// The action (buy/sell) of the order.
+    /// Taker fees in dollars (string, sometimes null).
+    #[serde(default)]
+    pub taker_fees_dollars: Option<String>,
+
+    /// Total cost of taker fills (cents).
+    #[serde(default)]
+    pub taker_fill_cost: Option<i32>,
+    /// Taker fill cost in dollars (string).
+    #[serde(default)]
+    pub taker_fill_cost_dollars: Option<String>,
+
+    /// Maker fees (cents).
+    #[serde(default)]
+    pub maker_fees: Option<i32>,
+    /// Maker fees in dollars (string, sometimes null).
+    #[serde(default)]
+    pub maker_fees_dollars: Option<String>,
+
+    /// Total cost of maker fills (cents).
+    #[serde(default)]
+    pub maker_fill_cost: Option<i32>,
+    /// Maker fill cost in dollars (string).
+    #[serde(default)]
+    pub maker_fill_cost_dollars: Option<String>,
+
+    // === Price (dollar string facades Kalshi now sends) ===
+    #[serde(default)]
+    pub yes_price_dollars: Option<String>,
+    #[serde(default)]
+    pub no_price_dollars: Option<String>,
+
+    // === Identifiers ===
     pub action: Action,
-    /// The side (Yes/No) of the order.
     pub side: Side,
-    /// Type of the order (e.g., market, limit).
+    /// Type of the order (e.g., "limit").
+    #[serde(rename = "type")]
     pub r#type: String,
-    /// Last update time of the order. Optional.
-    pub last_update_time: Option<String>,
     /// Client-side identifier for the order.
     pub client_order_id: String,
-    /// Group identifier for the order.
-    pub order_group_id: String,
+    /// Group identifier for the order (now nullable).
+    #[serde(default)]
+    pub order_group_id: Option<String>,
+
+    // === Misc newly-seen ===
+    /// Self-trade prevention type (nullable).
+    #[serde(default)]
+    pub self_trade_prevention_type: Option<String>,
 }
 
 /// A completed transaction (a 'fill') in the Kalshi exchange.
@@ -874,12 +960,16 @@ pub struct OrderCreationField {
     pub buy_max_cost: Option<i64>,
     /// Expiration time of the order. Optional.
     pub expiration_ts: Option<i64>,
-    /// Price of the 'No' option in the order. Optional.
+    /// Price of the 'No' option in the order (in cents). Optional.
     pub no_price: Option<i64>,
     /// The minimum position the seller is willing to hold after selling. Optional.
     pub sell_position_floor: Option<i32>,
-    /// Price of the 'Yes' option in the order. Optional.
+    /// Price of the 'Yes' option in the order (in cents). Optional.
     pub yes_price: Option<i64>,
+    /// Price of the 'Yes' option in dollars (e.g., "0.5000"). Optional.
+    pub yes_price_dollars: Option<String>,
+    /// Price of the 'No' option in dollars (e.g., "0.5000"). Optional.
+    pub no_price_dollars: Option<String>,
 }
 
 impl OrderParams for OrderCreationField {
@@ -895,8 +985,10 @@ impl OrderParams for OrderCreationField {
         Option<i64>,
         Option<i64>,
         Option<i64>,
-        Option<i32>,
         Option<i64>,
+        Option<i32>,
+        Option<String>,
+        Option<String>,
     ) {
         (
             self.action,
@@ -907,9 +999,11 @@ impl OrderParams for OrderCreationField {
             self.input_type,
             self.buy_max_cost,
             self.expiration_ts,
+            self.yes_price,
             self.no_price,
             self.sell_position_floor,
-            self.yes_price,
+            self.yes_price_dollars,
+            self.no_price_dollars,
         )
     }
 }
@@ -1001,8 +1095,10 @@ trait OrderParams {
         Option<i64>,
         Option<i64>,
         Option<i64>,
-        Option<i32>,
         Option<i64>,
+        Option<i32>,
+        Option<String>,
+        Option<String>,
     );
 }
 
@@ -1017,8 +1113,10 @@ impl OrderParams
         Option<i64>,
         Option<i64>,
         Option<i64>,
-        Option<i32>,
         Option<i64>,
+        Option<i32>,
+        Option<String>,
+        Option<String>,
     )
 {
     fn get_params(
@@ -1033,11 +1131,13 @@ impl OrderParams
         Option<i64>,
         Option<i64>,
         Option<i64>,
-        Option<i32>,
         Option<i64>,
+        Option<i32>,
+        Option<String>,
+        Option<String>,
     ) {
         (
-            self.0, self.1, self.2, self.3, self.4, self.5, self.6, self.7, self.8, self.9, self.10,
+            self.0, self.1, self.2, self.3, self.4, self.5, self.6, self.7, self.8, self.9, self.10, self.11, self.12,
         )
     }
 }
