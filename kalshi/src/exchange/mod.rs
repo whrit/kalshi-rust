@@ -221,7 +221,43 @@ impl Kalshi {
         self.check_exchange_active_with_backoff(5, 30.0, 300.0).await
     }
 
-    
+    /// Retrieves series fee changes from the exchange.
+    ///
+    /// This method fetches information about fee changes for specific series,
+    /// including historical and upcoming fee adjustments.
+    ///
+    /// # Arguments
+    ///
+    /// * `series_ticker` - Optional series ticker to filter fee changes.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Vec<SeriesFeeChange>)`: A vector of fee change information on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let fee_changes = kalshi_instance.get_series_fee_changes(None).await.unwrap();
+    /// for change in fee_changes {
+    ///     println!("Series: {}, New Fee: {}", change.series_ticker, change.new_fee);
+    /// }
+    /// ```
+    ///
+    pub async fn get_series_fee_changes(
+        &self,
+        series_ticker: Option<String>,
+    ) -> Result<Vec<SeriesFeeChange>, KalshiError> {
+        let path = "/series/fee_changes";
+        let mut params = vec![];
+        add_param!(params, "series_ticker", series_ticker);
+
+        let url = format!("{}{}", self.base_url, path);
+        let final_url = reqwest::Url::parse_with_params(&url, &params)?;
+        let res: SeriesFeeChangesResponse = self.client.get(final_url).send().await?.json().await?;
+        Ok(res.fee_changes)
+    }
 }
 
 // -------- public models --------
@@ -336,4 +372,22 @@ struct ExchangeScheduleResponse {
 struct ExchangeAnnouncementsResponse {
     cursor: Option<String>,
     announcements: Vec<ExchangeAnnouncement>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SeriesFeeChangesResponse {
+    fee_changes: Vec<SeriesFeeChange>,
+}
+
+/// Represents a fee change for a series.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SeriesFeeChange {
+    /// The series ticker.
+    pub series_ticker: String,
+    /// The old fee (in cents or basis points).
+    pub old_fee: Option<f64>,
+    /// The new fee (in cents or basis points).
+    pub new_fee: f64,
+    /// The effective date of the fee change.
+    pub effective_date: String,
 }

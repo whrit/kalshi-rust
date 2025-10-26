@@ -1,8 +1,6 @@
 use super::Kalshi;
 use crate::kalshi_error::*;
 use std::fmt;
-use std::sync::Arc;
-use tokio::task;
 use uuid::Uuid;
 
 use serde::{Deserialize, Deserializer, Serialize};
@@ -638,6 +636,262 @@ impl<'a> Kalshi {
         }
         Ok(out)
     }
+
+    /// Retrieves the total value of all resting orders for the authenticated user.
+    ///
+    /// This endpoint is primarily intended for use by FCM members.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(i64)`: The total resting order value in cents on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let total_value = kalshi_instance.get_total_resting_order_value().await.unwrap();
+    /// println!("Total resting order value: {} cents", total_value);
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// If you're uncertain about this endpoint, it likely does not apply to you.
+    ///
+    pub async fn get_total_resting_order_value(&self) -> Result<i64, KalshiError> {
+        let path = "/portfolio/summary/total_resting_order_value";
+        let res: TotalRestingOrderValueResponse = self.signed_get(path).await?;
+        Ok(res.total_resting_order_value)
+    }
+
+    /// Retrieves all order groups for the authenticated user.
+    ///
+    /// Order groups allow you to manage multiple related orders together.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Vec<OrderGroup>)`: A vector of order groups on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let order_groups = kalshi_instance.get_order_groups().await.unwrap();
+    /// ```
+    ///
+    pub async fn get_order_groups(&self) -> Result<Vec<OrderGroup>, KalshiError> {
+        let path = "/portfolio/order_groups";
+        let res: OrderGroupsResponse = self.signed_get(path).await?;
+        Ok(res.order_groups)
+    }
+
+    /// Creates a new order group.
+    ///
+    /// Order groups allow you to manage multiple related orders with shared limits.
+    ///
+    /// # Arguments
+    ///
+    /// * `contracts_limit` - The maximum number of contracts allowed across all orders in this group.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(OrderGroup)`: The created order group on successful creation.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let order_group = kalshi_instance.create_order_group(100).await.unwrap();
+    /// ```
+    ///
+    pub async fn create_order_group(&self, contracts_limit: i32) -> Result<OrderGroup, KalshiError> {
+        let path = "/portfolio/order_groups/create";
+        let body = CreateOrderGroupRequest { contracts_limit };
+        self.signed_post(path, &body).await
+    }
+
+    /// Retrieves a specific order group by ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_group_id` - The UUID of the order group to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(OrderGroup)`: The order group details on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let order_group = kalshi_instance.get_order_group("group-uuid").await.unwrap();
+    /// ```
+    ///
+    pub async fn get_order_group(&self, order_group_id: &str) -> Result<OrderGroup, KalshiError> {
+        let path = format!("/portfolio/order_groups/{}", order_group_id);
+        let res: OrderGroupResponse = self.signed_get(&path).await?;
+        Ok(res.order_group)
+    }
+
+    /// Deletes an order group.
+    ///
+    /// This will remove the order group but not cancel the orders within it.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_group_id` - The UUID of the order group to delete.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())`: Success confirmation.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// kalshi_instance.delete_order_group("group-uuid").await.unwrap();
+    /// ```
+    ///
+    pub async fn delete_order_group(&self, order_group_id: &str) -> Result<(), KalshiError> {
+        let path = format!("/portfolio/order_groups/{}", order_group_id);
+        let _res: DeleteOrderGroupResponse = self.signed_delete(&path).await?;
+        Ok(())
+    }
+
+    /// Resets an order group, canceling all orders within it.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_group_id` - The UUID of the order group to reset.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(OrderGroup)`: The reset order group on successful reset.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let order_group = kalshi_instance.reset_order_group("group-uuid").await.unwrap();
+    /// ```
+    ///
+    pub async fn reset_order_group(&self, order_group_id: &str) -> Result<OrderGroup, KalshiError> {
+        let path = format!("/portfolio/order_groups/{}/reset", order_group_id);
+        self.signed_put(&path, None::<&()>).await
+    }
+
+    /// Retrieves queue positions for multiple orders.
+    ///
+    /// This method provides information about where your orders are positioned
+    /// in the order book queue, helping you understand order priority.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_ids` - A vector of order IDs to get queue positions for.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Vec<OrderQueuePosition>)`: A vector of queue positions on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let order_ids = vec!["order-1".to_string(), "order-2".to_string()];
+    /// let positions = kalshi_instance.get_queue_positions(order_ids).await.unwrap();
+    /// ```
+    ///
+    pub async fn get_queue_positions(
+        &self,
+        order_ids: Vec<String>,
+    ) -> Result<Vec<OrderQueuePosition>, KalshiError> {
+        let path = "/portfolio/orders/queue_positions";
+        let mut params = vec![];
+        
+        // Add each order_id as a separate query parameter
+        for id in order_ids {
+            params.push(("order_ids".to_string(), id));
+        }
+
+        let url = format!("{}{}", self.base_url, path);
+        let final_url = reqwest::Url::parse_with_params(&url, &params)?;
+        let res: QueuePositionsResponse = self.client.get(final_url).send().await?.json().await?;
+        Ok(res.queue_positions)
+    }
+
+    /// Amends an existing order by modifying its price or quantity.
+    ///
+    /// This is an alternative to decrease_order that allows more flexibility.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_id` - The order ID to amend.
+    /// * `new_price` - Optional new price in cents.
+    /// * `new_quantity` - Optional new quantity of contracts.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Order)`: The amended order on successful modification.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let amended_order = kalshi_instance.amend_order(
+    ///     "order-uuid",
+    ///     Some(55),
+    ///     Some(50)
+    /// ).await.unwrap();
+    /// ```
+    ///
+    pub async fn amend_order(
+        &self,
+        order_id: &str,
+        new_price: Option<i32>,
+        new_quantity: Option<i32>,
+    ) -> Result<Order, KalshiError> {
+        let path = format!("/portfolio/orders/{}/amend", order_id);
+        let body = AmendOrderRequest {
+            new_price,
+            new_quantity,
+        };
+        let res: SingleOrderResponse = self.signed_post(&path, &body).await?;
+        Ok(res.order)
+    }
+
+    /// Retrieves the queue position for a single order.
+    ///
+    /// This method provides information about where a specific order is positioned
+    /// in the order book queue.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_id` - The order ID to get queue position for.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(OrderQueuePosition)`: The queue position on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let position = kalshi_instance.get_order_queue_position("order-uuid").await.unwrap();
+    /// println!("Order is at position {} in queue", position.queue_position);
+    /// ```
+    ///
+    pub async fn get_order_queue_position(&self, order_id: &str) -> Result<OrderQueuePosition, KalshiError> {
+        let path = format!("/portfolio/orders/{}/queue_position", order_id);
+        self.signed_get(&path).await
+    }
 }
 
 // PRIVATE STRUCTS
@@ -1182,6 +1436,58 @@ struct BatchCreateOrdersResponse {
 #[derive(Debug, Serialize, Deserialize)]
 struct BatchCancelOrdersResponse {
     orders: Vec<BatchCancelOrderResponseItem>,
+}
+
+// -------- New Portfolio Endpoints Structs --------
+
+#[derive(Debug, Deserialize)]
+struct TotalRestingOrderValueResponse {
+    total_resting_order_value: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateOrderGroupRequest {
+    contracts_limit: i32,
+}
+
+#[derive(Debug, Deserialize)]
+struct OrderGroupsResponse {
+    order_groups: Vec<OrderGroup>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OrderGroupResponse {
+    order_group: OrderGroup,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeleteOrderGroupResponse {}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OrderGroup {
+    pub id: String,
+    pub contracts_limit: i32,
+    pub total_contracts: Option<i32>,
+    pub order_ids: Vec<String>,
+    pub created_time: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct QueuePositionsResponse {
+    queue_positions: Vec<OrderQueuePosition>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OrderQueuePosition {
+    pub order_id: String,
+    pub queue_position: Option<i64>,
+    pub total_queue_depth: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+struct AmendOrderRequest {
+    new_price: Option<i32>,
+    new_quantity: Option<i32>,
 }
 
 #[cfg(test)]

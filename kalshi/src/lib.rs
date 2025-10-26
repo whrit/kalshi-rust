@@ -112,20 +112,36 @@
 #[macro_use]
 mod utils;
 mod auth;
+mod api_keys;
 mod collection;
+mod communications;
+mod events;
 mod exchange;
+mod fcm;
+mod incentive_programs;
 mod kalshi_error;
+mod live_data;
 mod market;
 mod milestone;
 mod portfolio;
+mod search;
+mod structured_targets;
 
 // pub use auth::*;  // Unused import
+pub use api_keys::*;
 pub use collection::*;
+pub use communications::*;
+pub use events::*;
 pub use exchange::*;
+pub use fcm::FcmPosition; // Only export the specific type, not all
+pub use incentive_programs::*;
 pub use kalshi_error::*;
+pub use live_data::*;
 pub use market::*;
 pub use milestone::*;
 pub use portfolio::*;
+pub use search::*;
+pub use structured_targets::*;
 
 // imports
 use reqwest;

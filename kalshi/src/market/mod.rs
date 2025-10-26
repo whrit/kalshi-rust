@@ -4,82 +4,6 @@ use serde::{Deserialize, Serialize, Deserializer};
 use std::collections::HashMap;
 
 impl<'a> Kalshi {
-    /// Retrieves a list of events from the Kalshi exchange based on specified criteria.
-    ///
-    /// This method fetches multiple events, allowing for filtering by status, series ticker,
-    /// and pagination. The events represent prediction markets that users can trade on.
-    ///
-    /// # Arguments
-    ///
-    /// * `limit` - An optional integer to limit the number of events returned.
-    /// * `cursor` - An optional string for pagination cursor.
-    /// * `status` - An optional string to filter events by their status.
-    /// * `series_ticker` - An optional string to filter events by series ticker.
-    /// * `with_nested_markets` - An optional boolean to include nested markets in the response.
-    ///
-    /// # Returns
-    ///
-    /// - `Ok((Option<String>, Vec<Event>))`: A tuple containing an optional pagination cursor
-    ///   and a vector of `Event` objects on successful retrieval.
-    /// - `Err(KalshiError)`: An error if there is an issue with the request.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let (cursor, events) = kalshi_instance.get_events(
-    ///     Some(10), None, Some("open".to_string()), None, Some(true)
-    /// ).await.unwrap();
-    /// ```
-    ///
-    pub async fn get_events(
-        &self,
-        limit: Option<i64>, cursor: Option<String>,
-        status: Option<String>, series_ticker: Option<String>,
-        with_nested_markets: Option<bool>,
-    ) -> Result<(Option<String>, Vec<Event>), KalshiError> {
-        let url = format!("{}/events", self.base_url);
-        let mut p = vec![];
-        add_param!(p, "limit", limit);
-        add_param!(p, "cursor", cursor);
-        add_param!(p, "status", status);
-        add_param!(p, "series_ticker", series_ticker);
-        add_param!(p, "with_nested_markets", with_nested_markets);
-
-        let res: EventListResponse = self.client
-            .get(reqwest::Url::parse_with_params(&url, &p)?)
-            .send().await?.json().await?;
-        Ok((res.cursor, res.events))
-    }
-
-    /// Retrieves detailed information about a specific event from the Kalshi exchange.
-    ///
-    /// This method fetches data for a single event identified by its event ticker.
-    /// The event represents a prediction market with associated markets that users can trade on.
-    ///
-    /// # Arguments
-    ///
-    /// * `event_ticker` - A string slice referencing the event's unique ticker identifier.
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(Event)`: Detailed information about the specified event on successful retrieval.
-    /// - `Err(KalshiError)`: An error if there is an issue with the request.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let event_ticker = "SOME-EVENT-2024";
-    /// let event = kalshi_instance.get_event(event_ticker).await.unwrap();
-    /// ```
-    ///
-    pub async fn get_event(&self, event_ticker: &str) -> Result<Event, KalshiError> {
-        let url = format!("{}/events/{}", self.base_url, event_ticker);
-        let res: SingleEventResponse = self.client.get(url).send().await?.json().await?;
-        Ok(res.event)
-    }
-
     /// Retrieves a list of markets from the Kalshi exchange based on specified criteria.
     ///
     /// This method fetches multiple markets, allowing for filtering by event ticker, series ticker,
@@ -723,12 +647,6 @@ pub struct SettlementSource {
 // -------- response wrappers --------
 
 #[derive(Debug, Deserialize)]
-struct EventListResponse {
-    cursor: Option<String>,
-    events: Vec<Event>,
-}
-
-#[derive(Debug, Deserialize)]
 struct MarketListResponse {
     cursor: Option<String>,
     markets: Vec<Market>,
@@ -751,12 +669,6 @@ struct TradeListResponse {
 struct CandlestickListResponse {
     cursor: Option<String>,
     candlesticks: Vec<Candle>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SingleEventResponse {
-    event: Event,
-    markets: Option<Vec<Market>>,
 }
 
 #[derive(Debug, Deserialize)]
