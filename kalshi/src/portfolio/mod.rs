@@ -1163,7 +1163,8 @@ pub struct EventPosition {
     /// The realized profit or loss in the event in cents.
     pub realized_pnl: i64,
     /// The count of resting (active but unfilled) orders in the event.
-    pub resting_order_count: i32,
+    #[serde(default)]
+    pub resting_order_count: Option<i32>,
     /// The total cost incurred in the event in cents.
     pub total_cost: i64,
 }
@@ -1184,7 +1185,8 @@ pub struct MarketPosition {
     /// The realized profit or loss in the market in cents.
     pub realized_pnl: i64,
     /// The count of resting orders in the market.
-    pub resting_orders_count: i32,
+    #[serde(default)]
+    pub resting_orders_count: Option<i32>,
     /// The ticker of the market.
     pub ticker: String,
     /// The total traded amount in the market.
