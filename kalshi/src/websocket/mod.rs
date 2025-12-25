@@ -9,6 +9,6 @@ mod messages;
 mod subscription;
 
 pub use channels::Channel;
-pub use connection::KalshiWebSocket;
+pub use connection::{CommandResponse, KalshiWebSocket};
 pub use messages::*;
 pub use subscription::{SubscribeResponse, Subscription, UpdateAction};

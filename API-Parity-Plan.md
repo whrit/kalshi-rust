@@ -39,7 +39,7 @@ dependency.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| 2.1 Add batch_get_market_candlesticks() | ✅ Done | Added in market/mod.rs with MarketCandlesticks struct |
+| 2.1 Add batch_get_market_candlesticks() | ✅ Done | Added in market/mod.rs with MarketCandlesticks struct + 100 ticker validation |
 | 2.2 Add get_multivariate_events() | ✅ Done | Added in events/mod.rs with validation for mutually exclusive filters |
 | 2.3 Add get_communications_id() | ✅ Done | Added in communications/mod.rs, returns user's public communications ID |
 | 2.4 Update get_markets() - Add Missing Query Params | ✅ Done | Added timestamp filters and MveFilter enum |
@@ -59,10 +59,10 @@ dependency.
 |------|--------|-------|
 | 4.1 Add Dependencies | ✅ Done | Added tokio-tungstenite 0.21, futures-util 0.3 to Cargo.toml |
 | 4.2 Create WebSocket Module Structure | ✅ Done | Created websocket/mod.rs with submodule declarations |
-| 4.3 Connection Handler | ✅ Done | Created connection.rs with KalshiWebSocket, auth, connect/disconnect |
+| 4.3 Connection Handler | ✅ Done | Created connection.rs with KalshiWebSocket, auth, connect/disconnect + CommandResponse enum + pending_commands tracking |
 | 4.4 Channel Definitions | ✅ Done | Created channels.rs with Channel enum (9 channels), Display, requires_auth() |
 | 4.5 Message Types | ✅ Done | Created messages.rs with 15+ message types, WebSocketMessage::parse() |
-| 4.6 Subscription Management | ✅ Done | Created subscription.rs with subscribe/unsubscribe/update methods |
+| 4.6 Subscription Management | ✅ Done | Created subscription.rs with subscribe/unsubscribe/update methods + response correlation + SID tracking |
 | 4.7 Stream Interface | ✅ Done | Added Stream trait impl for async message polling in connection.rs |
 | 4.8 Integration with Kalshi Struct | ✅ Done | Added websocket() factory and trading_env() to lib.rs |
 

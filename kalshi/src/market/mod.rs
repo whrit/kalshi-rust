@@ -309,6 +309,12 @@ impl Kalshi {
         period_interval: i32,
         include_latest_before_start: Option<bool>,
     ) -> Result<Vec<MarketCandlesticks>, KalshiError> {
+        if market_tickers.len() > 100 {
+            return Err(KalshiError::UserInputError(
+                "Maximum 100 market tickers allowed per batch request".to_string(),
+            ));
+        }
+
         let url = format!("{}/markets/candlesticks/batch", self.base_url);
 
         // Join tickers with commas as required by the API

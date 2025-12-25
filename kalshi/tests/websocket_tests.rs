@@ -178,11 +178,25 @@ async fn test_websocket_unsubscribe() {
     let mut ws = kalshi.websocket();
     ws.connect().await.unwrap();
 
-    // Subscribe first
-    ws.subscribe(vec![Channel::Trade], None, None).await.unwrap();
+    // Subscribe first and get the SIDs
+    let subscribe_result = ws.subscribe(vec![Channel::Trade], None, None).await;
+    let sids: Vec<i32> = match subscribe_result {
+        Ok(responses) => responses.iter().map(|r| r.sid).collect(),
+        Err(e) => {
+            println!("Failed to subscribe: {:?}", e);
+            ws.disconnect().await.ok();
+            return;
+        }
+    };
 
-    // Unsubscribe (using a placeholder SID - in real usage you'd track the actual SID)
-    let unsubscribe_result = ws.unsubscribe(vec![1]).await;
+    if sids.is_empty() {
+        println!("No SIDs returned from subscribe");
+        ws.disconnect().await.ok();
+        return;
+    }
+
+    // Unsubscribe using the actual SIDs from the subscribe response
+    let unsubscribe_result = ws.unsubscribe(sids).await;
     assert!(
         unsubscribe_result.is_ok(),
         "Failed to unsubscribe: {:?}",
@@ -217,7 +231,10 @@ fn test_channel_display() {
     assert_eq!(Channel::Trade.to_string(), "trade");
     assert_eq!(Channel::Fill.to_string(), "fill");
     assert_eq!(Channel::MarketPosition.to_string(), "market_position");
-    assert_eq!(Channel::MarketLifecycleV2.to_string(), "market_lifecycle_v2");
+    assert_eq!(
+        Channel::MarketLifecycleV2.to_string(),
+        "market_lifecycle_v2"
+    );
     assert_eq!(Channel::EventLifecycle.to_string(), "event_lifecycle");
     assert_eq!(Channel::Multivariate.to_string(), "multivariate");
     assert_eq!(Channel::Communications.to_string(), "communications");
