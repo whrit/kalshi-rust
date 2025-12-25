@@ -83,8 +83,6 @@ fn test_self_trade_prevention_type_deserialization() {
 fn test_create_order_payload_serialization_all_new_fields() {
     // This test verifies that CreateOrderPayload properly serializes all new optional fields
     // and that skip_serializing_if works correctly
-    use kalshi::{TimeInForce, SelfTradePreventionType};
-
     // Create a minimal payload with only required fields
     let minimal_json = serde_json::json!({
         "action": "buy",
@@ -110,8 +108,6 @@ fn test_create_order_payload_serialization_all_new_fields() {
 
 #[test]
 fn test_create_order_payload_serialization_with_new_fields() {
-    use kalshi::{TimeInForce, SelfTradePreventionType};
-
     // Create a payload with all new fields populated
     let full_json = serde_json::json!({
         "action": "buy",
@@ -179,7 +175,7 @@ fn test_order_creation_field_new_params() {
 #[tokio::test]
 async fn test_create_order_with_time_in_force() {
     // This will fail until create_order signature is updated
-    use kalshi::{TimeInForce, SelfTradePreventionType};
+    use kalshi::TimeInForce;
 
     let kalshi = match common::skip_if_no_auth() {
         Some(auth) => auth.create_kalshi().await.unwrap(),
@@ -456,7 +452,7 @@ async fn test_get_settlements_with_ticker_filter() {
     ).await;
 
     match result {
-        Ok((cursor, settlements)) => {
+        Ok((_cursor, settlements)) => {
             println!("Got settlements with ticker filter: {} results", settlements.len());
             // Verify ticker parameter was accepted
             assert!(true, "ticker parameter accepted");
@@ -489,7 +485,7 @@ async fn test_get_settlements_with_event_ticker_filter() {
     ).await;
 
     match result {
-        Ok((cursor, settlements)) => {
+        Ok((_cursor, settlements)) => {
             println!("Got settlements with event_ticker filter: {} results", settlements.len());
             assert!(true, "event_ticker parameter accepted");
         }
@@ -523,7 +519,7 @@ async fn test_get_settlements_with_timestamp_filters() {
     ).await;
 
     match result {
-        Ok((cursor, settlements)) => {
+        Ok((_cursor, settlements)) => {
             println!("Got settlements with timestamp filters: {} results", settlements.len());
             assert!(true, "timestamp parameters accepted");
         }
@@ -554,7 +550,7 @@ async fn test_get_settlements_with_all_new_filters() {
     ).await;
 
     match result {
-        Ok((cursor, settlements)) => {
+        Ok((_cursor, settlements)) => {
             println!("Got settlements with all filters: {} results", settlements.len());
             assert!(true, "All new parameters accepted");
         }
@@ -589,7 +585,7 @@ async fn test_get_positions_with_count_filter_position() {
     ).await;
 
     match result {
-        Ok((cursor, event_positions, market_positions)) => {
+        Ok((_cursor, event_positions, market_positions)) => {
             println!("Got positions with count_filter='position': {} events, {} markets",
                      event_positions.len(), market_positions.len());
             assert!(true, "count_filter parameter accepted");
@@ -621,7 +617,7 @@ async fn test_get_positions_with_count_filter_total_traded() {
     ).await;
 
     match result {
-        Ok((cursor, event_positions, market_positions)) => {
+        Ok((_cursor, event_positions, market_positions)) => {
             println!("Got positions with count_filter='total_traded': {} events, {} markets",
                      event_positions.len(), market_positions.len());
             assert!(true, "count_filter='total_traded' accepted");
@@ -653,7 +649,7 @@ async fn test_get_positions_with_count_filter_combined() {
     ).await;
 
     match result {
-        Ok((cursor, event_positions, market_positions)) => {
+        Ok((_cursor, event_positions, market_positions)) => {
             println!("Got positions with combined count_filter: {} events, {} markets",
                      event_positions.len(), market_positions.len());
             assert!(true, "Combined count_filter accepted");
@@ -685,7 +681,7 @@ async fn test_get_positions_without_count_filter() {
     ).await;
 
     match result {
-        Ok((cursor, event_positions, market_positions)) => {
+        Ok((_cursor, event_positions, market_positions)) => {
             println!("Got positions without count_filter: {} events, {} markets",
                      event_positions.len(), market_positions.len());
             assert!(true, "Backward compatibility maintained");

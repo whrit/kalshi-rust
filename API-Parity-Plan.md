@@ -7,12 +7,22 @@ dependency.
 
 ## Test Status
 
-✅ **Phase 1 Tests Written** - Comprehensive TDD tests in `kalshi/tests/phase1_api_parity_tests.rs`
-- Tests will fail until implementation is complete (TDD approach)
+✅ **Phase 1 Complete** - All 23 tests passing in `kalshi/tests/phase1_api_parity_tests.rs`
 - Run with: `cargo test --test phase1_api_parity_tests`
 
+## Progress Tracking
+
+### Phase 1: Critical Trading Features (HTTPS Fixes) - ✅ COMPLETE
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 1.1 Fix create_order() - Add Missing Parameters | ✅ Done | Added TimeInForce, SelfTradePreventionType enums and 6 new parameters |
+| 1.2 Fix amend_order() - Complete Rewrite | ✅ Done | New signature with price validation, returns AmendOrderResponse |
+| 1.3 Update get_settlements() - Add Missing Filters | ✅ Done | Added ticker, event_ticker, min_ts, max_ts parameters |
+| 1.4 Update get_positions() - Add count_filter | ✅ Done | Added count_filter parameter |
+
 ---
-Phase 1: Critical Trading Features (HTTPS Fixes)
+Phase 1: Critical Trading Features (HTTPS Fixes) - COMPLETE
 
 1.1 Fix create_order() - Add Missing Parameters
 

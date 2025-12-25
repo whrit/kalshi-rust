@@ -357,6 +357,7 @@ impl<'a> Kalshi {
     /// * `settlement_status` - An optional string to filter positions by their settlement status.
     /// * `ticker` - An optional string to filter positions by market ticker.
     /// * `event_ticker` - An optional string to filter positions by event ticker.
+    /// * `count_filter` - An optional string to filter positions by count type ("position", "total_traded", or both comma-separated).
     ///
     /// # Returns
     ///
@@ -368,7 +369,7 @@ impl<'a> Kalshi {
     ///
     /// ```
     /// // Assuming `kalshi_instance` is an already authenticated instance of `Kalshi`
-    /// let positions = kalshi_instance.get_positions(None, None, None, None, None).await.unwrap();
+    /// let positions = kalshi_instance.get_positions(None, None, None, None, None, None).await.unwrap();
     /// ```
     ///
     pub async fn get_positions(
@@ -378,14 +379,16 @@ impl<'a> Kalshi {
         settlement_status: Option<String>,
         ticker: Option<String>,
         event_ticker: Option<String>,
+        count_filter: Option<String>,
     ) -> Result<(Option<String>, Vec<EventPosition>, Vec<MarketPosition>), KalshiError> {
-        let mut params: Vec<(&str, String)> = Vec::with_capacity(6);
+        let mut params: Vec<(&str, String)> = Vec::with_capacity(7);
 
         add_param!(params, "limit", limit);
         add_param!(params, "cursor", cursor);
         add_param!(params, "settlement_status", settlement_status);
         add_param!(params, "ticker", ticker);
         add_param!(params, "event_ticker", event_ticker);
+        add_param!(params, "count_filter", count_filter);
 
         let path = if params.is_empty() {
             format!("{}/positions", PORTFOLIO_PATH)
@@ -1060,10 +1063,15 @@ pub struct Order {
     pub ticker: String,
     /// Current status of the order (e.g., resting, executed).
     pub status: OrderStatus,
-    /// Price of the 'Yes' option in the order (cents).
-    pub yes_price: i32,
-    /// Price of the 'No' option in the order (cents).
-    pub no_price: i32,
+    /// Price of the 'Yes' option in the order (cents). Optional for some responses.
+    #[serde(default)]
+    pub yes_price: Option<i32>,
+    /// Price of the 'No' option in the order (cents). Optional for some responses.
+    #[serde(default)]
+    pub no_price: Option<i32>,
+    /// Count of contracts in the order. Optional for some responses.
+    #[serde(default)]
+    pub count: Option<i32>,
 
     /// Timestamp when the order was created. Optional.
     #[serde(default)]

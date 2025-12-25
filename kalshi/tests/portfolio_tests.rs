@@ -41,11 +41,11 @@ async fn test_get_fills() {
 #[tokio::test]
 async fn test_get_settlements() {
     let kalshi = setup_auth_test().await.unwrap();
-    
+
     // Test getting settlements
-    let result = kalshi.get_settlements(None, None).await;
+    let result = kalshi.get_settlements(None, None, None, None, None, None).await;
     assert!(result.is_ok(), "Failed to get settlements: {:?}", result.err());
-    
+
     let (_cursor, _settlements) = result.unwrap();
     // Settlements might be empty, which is fine
 }
@@ -53,11 +53,11 @@ async fn test_get_settlements() {
 #[tokio::test]
 async fn test_get_positions() {
     let kalshi = setup_auth_test().await.unwrap();
-    
+
     // Test getting positions
-    let result = kalshi.get_positions(None, None, None, None, None).await;
+    let result = kalshi.get_positions(None, None, None, None, None, None).await;
     assert!(result.is_ok(), "Failed to get positions: {:?}", result.err());
-    
+
     let (_cursor, _event_positions, _market_positions) = result.unwrap();
     // Positions might be empty, which is fine
 }

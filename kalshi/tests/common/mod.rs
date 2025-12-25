@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use kalshi::{Kalshi, TradingEnvironment, KalshiError};
 use std::env;
 use std::sync::Once;
@@ -115,11 +117,19 @@ pub mod utils {
                 kalshi::Side::Yes,
                 get_test_market_ticker(),
                 kalshi::OrderType::Limit,
-                None,
-                None,
-                None,
-                None,
-                Some(1), // Very low price
+                None,                       // buy_max_cost
+                None,                       // expiration_ts
+                Some(1),                    // yes_price (very low price)
+                None,                       // no_price
+                None,                       // sell_position_floor
+                None,                       // yes_price_dollars
+                None,                       // no_price_dollars
+                None,                       // time_in_force
+                None,                       // post_only
+                None,                       // reduce_only
+                None,                       // self_trade_prevention_type
+                None,                       // order_group_id
+                None,                       // cancel_order_on_pause
             )
             .await
     }
