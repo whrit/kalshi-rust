@@ -1,3 +1,301 @@
+//! Market data retrieval and analysis.
+//!
+//! This module provides comprehensive access to Kalshi market data, enabling you to
+//! query markets, retrieve orderbooks, track trades, analyze price history, and explore
+//! series and events. Market data is mostly public and does not require authentication
+//! (with some exceptions for authenticated user-specific queries).
+//!
+//! # Overview
+//!
+//! The market module encompasses several data categories:
+//!
+//! - **Markets**: Individual binary prediction markets (Yes/No outcomes)
+//! - **Series**: Collections of related events (e.g., "HIGHNY" for NYC temperature)
+//! - **Events**: Specific prediction events containing one or more markets
+//! - **Orderbooks**: Current bid/ask levels and market depth
+//! - **Trades**: Historical trade executions
+//! - **Candlesticks**: OHLC price data for technical analysis
+//!
+//! # Quick Start - Getting Market Data
+//!
+//! ```rust,ignore
+//! use kalshi::{Kalshi, TradingEnvironment};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let kalshi = Kalshi::new(
+//!     TradingEnvironment::DemoMode,
+//!     "your-key-id",
+//!     "path/to/private.pem"
+//! ).await?;
+//!
+//! // Get a specific market
+//! let market = kalshi.get_market("HIGHNY-24JAN15-T50").await?;
+//! println!("Market: {}", market.title);
+//! println!("Yes bid: {} | Yes ask: {}", market.yes_bid, market.yes_ask);
+//! println!("Volume: {} | Open interest: {}", market.volume, market.open_interest);
+//!
+//! // Get the current orderbook
+//! let orderbook = kalshi.get_orderbook("HIGHNY-24JAN15-T50", Some(5)).await?;
+//! println!("Orderbook depth: {:?}", orderbook.yes);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Key Concepts
+//!
+//! ## Market Structure
+//!
+//! Each market represents a binary outcome (Yes/No) on a specific question:
+//! - **Ticker**: Unique identifier (e.g., "HIGHNY-24JAN15-T50")
+//! - **Event Ticker**: Parent event (e.g., "HIGHNY-24JAN15")
+//! - **Series Ticker**: Series family (e.g., "HIGHNY")
+//! - **Title**: Human-readable question
+//! - **Status**: open, closed, or settled
+//!
+//! ## Pricing
+//!
+//! Market prices are displayed in cents (0-100):
+//! - **yes_bid**: Highest price someone is willing to pay for YES
+//! - **yes_ask**: Lowest price someone is willing to sell YES for
+//! - **no_bid/no_ask**: Equivalent for NO contracts
+//! - **last_price**: Most recent trade execution price
+//!
+//! ## Orderbook
+//!
+//! The orderbook shows all active bids and asks at various price levels:
+//! - Each level shows [price, quantity]
+//! - **yes** side: Bids and asks for YES contracts
+//! - **no** side: Bids and asks for NO contracts
+//!
+//! # Common Workflows
+//!
+//! ## Finding Markets
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! // Search for open markets in a specific event
+//! let (cursor, markets) = kalshi.get_markets(
+//!     Some(20),                          // limit
+//!     None,                              // cursor
+//!     Some("HIGHNY-24JAN15".to_string()), // event_ticker
+//!     None,                              // series_ticker
+//!     Some("open".to_string()),          // status
+//!     None,                              // tickers
+//!     None, None, None, None, None, None, None, // timestamps & filters
+//! ).await?;
+//!
+//! for market in markets {
+//!     println!("{}: {} (volume: {})", market.ticker, market.title, market.volume);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Analyzing the Orderbook
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let orderbook = kalshi.get_orderbook("HIGHNY-24JAN15-T50", Some(10)).await?;
+//!
+//! // Check YES side liquidity
+//! if let Some(yes_levels) = &orderbook.yes {
+//!     println!("YES orderbook:");
+//!     for level in yes_levels {
+//!         if level.len() >= 2 {
+//!             println!("  Price: {} | Quantity: {}", level[0], level[1]);
+//!         }
+//!     }
+//! }
+//!
+//! // Dollar prices are also available
+//! for (price, qty) in &orderbook.yes_dollars {
+//!     println!("  ${:.4} | {} contracts", price, qty);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Viewing Recent Trades
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let (cursor, trades) = kalshi.get_trades(
+//!     Some(50),                          // limit
+//!     None,                              // cursor
+//!     Some("HIGHNY-24JAN15-T50".to_string()), // ticker
+//!     None,                              // min_ts
+//!     None,                              // max_ts
+//! ).await?;
+//!
+//! for trade in trades {
+//!     println!("Trade: {} contracts @ {} ({})",
+//!         trade.count,
+//!         trade.yes_price,
+//!         trade.created_time
+//!     );
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Getting Historical Price Data
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! // Get 1-hour candlesticks for the past 24 hours
+//! let now = chrono::Utc::now().timestamp();
+//! let day_ago = now - 86400;
+//!
+//! let candlesticks = kalshi.get_market_candlesticks(
+//!     "HIGHNY-24JAN15-T50",
+//!     "HIGHNY",
+//!     Some(day_ago),
+//!     Some(now),
+//!     Some(60),  // 60-minute intervals
+//! ).await?;
+//!
+//! for candle in candlesticks {
+//!     println!("{}: O:{} H:{} L:{} C:{} V:{}",
+//!         candle.start_ts,
+//!         candle.yes_open,
+//!         candle.yes_high,
+//!         candle.yes_low,
+//!         candle.yes_close,
+//!         candle.volume
+//!     );
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Exploring Series and Events
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! // Get a series and its events
+//! let series = kalshi.get_series("HIGHNY").await?;
+//! println!("Series: {}", series.title.as_ref().unwrap_or(&"Unknown".to_string()));
+//!
+//! // Get events in the series
+//! let (cursor, events) = kalshi.get_events(
+//!     Some(10),                   // limit
+//!     None,                       // cursor
+//!     Some("open".to_string()),   // status
+//!     Some("HIGHNY".to_string()), // series_ticker
+//!     Some(true),                 // with_nested_markets
+//!     None, None,                 // with_milestones, min_close_ts
+//! ).await?;
+//!
+//! for event in events {
+//!     println!("Event: {} - {}", event.event_ticker, event.title);
+//!     if let Some(markets) = &event.markets {
+//!         println!("  Contains {} markets", markets.len());
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Advanced Features
+//!
+//! ## Batch Candlestick Retrieval
+//!
+//! Fetch candlestick data for multiple markets simultaneously for better performance:
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let tickers = vec![
+//!     "MARKET-1".to_string(),
+//!     "MARKET-2".to_string(),
+//!     "MARKET-3".to_string(),
+//! ];
+//!
+//! let now = chrono::Utc::now().timestamp();
+//! let hour_ago = now - 3600;
+//!
+//! let results = kalshi.batch_get_market_candlesticks(
+//!     tickers,
+//!     hour_ago,
+//!     now,
+//!     60,        // 60-minute interval
+//!     Some(true), // include_latest_before_start
+//! ).await?;
+//!
+//! for market_candles in results {
+//!     println!("Market {}: {} candlesticks",
+//!         market_candles.ticker,
+//!         market_candles.candlesticks.len()
+//!     );
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Filtering Markets with MVE
+//!
+//! Filter multivariate event (MVE) markets:
+//!
+//! ```rust,ignore
+//! # use kalshi::{Kalshi, MveFilter};
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! // Only get MVE markets
+//! let (cursor, markets) = kalshi.get_markets(
+//!     Some(50),
+//!     None, None, None, None, None,
+//!     None, None, None, None, None, None,
+//!     Some(MveFilter::Only),  // Only MVE markets
+//! ).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Data Structures
+//!
+//! ## Market
+//!
+//! The [`Market`] struct contains comprehensive information about a prediction market:
+//! - Market identification (ticker, event_ticker, series_ticker)
+//! - Status and lifecycle (status, open_time, close_time, expiration_time)
+//! - Current prices (yes_bid, yes_ask, no_bid, no_ask, last_price)
+//! - Market activity (volume, volume_24h, open_interest, liquidity)
+//! - Settlement (result, settlement_value)
+//!
+//! ## Orderbook
+//!
+//! The [`Orderbook`] struct represents the current market depth:
+//! - `yes` / `no`: Price levels in cents as `Vec<Vec<i32>>`
+//! - `yes_dollars` / `no_dollars`: Price levels in dollars as `Vec<(f32, i32)>`
+//!
+//! ## Candle
+//!
+//! The [`Candle`] struct provides OHLC data for price analysis:
+//! - Time range (start_ts, end_ts)
+//! - YES prices (yes_open, yes_high, yes_low, yes_close)
+//! - NO prices (no_open, no_high, no_low, no_close)
+//! - Volume and open_interest for the period
+//!
+//! # Best Practices
+//!
+//! 1. **Use filters**: Narrow down market queries with status, event_ticker, or series_ticker
+//! 2. **Limit results**: Always specify a reasonable limit to avoid overwhelming responses
+//! 3. **Batch operations**: Use batch endpoints when fetching data for multiple markets
+//! 4. **WebSocket for real-time**: For live data, use WebSocket subscriptions instead of polling
+//! 5. **Candlestick intervals**: Choose appropriate intervals (1, 60, or 1440 minutes)
+//!
+//! # See Also
+//!
+//! - [`get_market`](crate::Kalshi::get_market) - Retrieve a specific market
+//! - [`get_markets`](crate::Kalshi::get_markets) - Query multiple markets
+//! - [`get_orderbook`](crate::Kalshi::get_orderbook) - Get current orderbook
+//! - [`get_trades`](crate::Kalshi::get_trades) - Retrieve trade history
+//! - [`get_market_candlesticks`](crate::Kalshi::get_market_candlesticks) - Historical price data
+
 use super::Kalshi;
 use crate::kalshi_error::*;
 use serde::{Deserialize, Deserializer, Serialize};

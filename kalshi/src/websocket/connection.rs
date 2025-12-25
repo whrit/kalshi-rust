@@ -14,20 +14,126 @@ type WsSink = SplitSink<WsStream, Message>;
 type WsReader = SplitStream<WsStream>;
 
 /// Response from a WebSocket command.
+///
+/// When you send commands to the WebSocket server (subscribe, unsubscribe, etc.),
+/// the server responds with one of these message types to confirm or reject the action.
+///
+/// # Variants
+///
+/// - `Ok`: Command was successful
+/// - `Error`: Command failed (includes error code and message)
+/// - `Subscribed`: Subscription confirmed (includes subscription ID and channel name)
 #[derive(Debug, Clone)]
 pub enum CommandResponse {
-    /// Successful acknowledgment.
+    /// Successful acknowledgment from the server.
+    ///
+    /// # Fields
+    /// - `id`: The command ID that was acknowledged
     Ok { id: i32 },
+
     /// Error response from the server.
+    ///
+    /// # Fields
+    /// - `code`: Numeric error code
+    /// - `msg`: Human-readable error message
     Error { code: i32, msg: String },
-    /// Subscription confirmation with assigned SID.
+
+    /// Subscription confirmation with assigned subscription ID.
+    ///
+    /// # Fields
+    /// - `sid`: Subscription ID assigned by the server
+    /// - `channel`: The channel name that was subscribed to
     Subscribed { sid: i32, channel: String },
 }
 
 /// Default timeout for waiting on command responses (in seconds).
 const DEFAULT_COMMAND_TIMEOUT_SECS: u64 = 10;
 
-/// WebSocket client for real-time Kalshi data.
+/// WebSocket client for real-time Kalshi market data and trading events.
+///
+/// `KalshiWebSocket` provides a persistent, authenticated connection to the Kalshi
+/// WebSocket API for streaming market data and portfolio updates. The client handles
+/// authentication, subscription management, and message routing automatically.
+///
+/// # Features
+///
+/// - **Automatic authentication** using RSA-PSS signing
+/// - **Subscription management** with support for multiple simultaneous channels
+/// - **Async streaming** interface compatible with Tokio and futures
+/// - **Connection lifecycle** management (connect, disconnect, reconnect)
+/// - **Type-safe messages** via the [`WebSocketMessage`](super::WebSocketMessage) enum
+///
+/// # Creating a Client
+///
+/// The WebSocket client is typically created from an existing [`Kalshi`](crate::Kalshi)
+/// instance using the [`websocket()`](crate::Kalshi::websocket) method, which automatically
+/// transfers the authentication credentials.
+///
+/// ```rust,ignore
+/// use kalshi::{Kalshi, TradingEnvironment};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let kalshi = Kalshi::new(
+///     TradingEnvironment::DemoMode,
+///     "your-key-id",
+///     "path/to/private.pem"
+/// ).await?;
+///
+/// let mut ws = kalshi.websocket();
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Connection Flow
+///
+/// 1. **Create** the client (does not connect automatically)
+/// 2. **Connect** with [`connect()`](KalshiWebSocket::connect)
+/// 3. **Subscribe** to channels using subscription methods
+/// 4. **Stream** messages using the [`messages()`](KalshiWebSocket::messages) stream
+/// 5. **Disconnect** with [`disconnect()`](KalshiWebSocket::disconnect) when done
+///
+/// # Example Usage
+///
+/// ```rust,ignore
+/// use kalshi::{Kalshi, TradingEnvironment, WebSocketMessage};
+/// use futures_util::StreamExt;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let kalshi = Kalshi::new(TradingEnvironment::DemoMode, "key", "key.pem").await?;
+/// let mut ws = kalshi.websocket();
+///
+/// // Connect to WebSocket
+/// ws.connect().await?;
+///
+/// // Subscribe to channels
+/// ws.subscribe_to_ticker("HIGHNY-24JAN15-T50").await?;
+/// ws.subscribe_to_fills().await?;
+///
+/// // Process messages
+/// let mut stream = ws.messages();
+/// while let Some(msg) = stream.next().await {
+///     match msg {
+///         WebSocketMessage::Ticker(ticker) => {
+///             println!("Ticker update: {} @ {}", ticker.ticker, ticker.last_price);
+///         }
+///         WebSocketMessage::Fill(fill) => {
+///             println!("Fill: {} contracts on {}", fill.count, fill.ticker);
+///         }
+///         _ => {}
+///     }
+/// }
+///
+/// // Clean disconnect
+/// ws.disconnect().await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Thread Safety
+///
+/// The WebSocket client is not `Send` or `Sync` and must be used from a single async task.
+/// The internal writer is wrapped in an `Arc<Mutex<>>` to allow sharing across message
+/// processing, but the overall client should not be shared across threads.
 pub struct KalshiWebSocket {
     url: String,
     key_id: String,
@@ -41,7 +147,46 @@ pub struct KalshiWebSocket {
 }
 
 impl KalshiWebSocket {
-    /// Creates a new WebSocket client (does not connect yet).
+    /// Creates a new WebSocket client without establishing a connection.
+    ///
+    /// This method initializes the WebSocket client with the necessary credentials
+    /// but does not open a network connection. Call [`connect()`](KalshiWebSocket::connect)
+    /// to establish the connection.
+    ///
+    /// # Arguments
+    ///
+    /// * `trading_env` - The trading environment (DemoMode or ProdMode)
+    /// * `key_id` - Your Kalshi API key ID
+    /// * `private_key` - Your RSA private key for signing authentication requests
+    ///
+    /// # Returns
+    ///
+    /// A new `KalshiWebSocket` instance ready to connect.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use kalshi::{TradingEnvironment, KalshiWebSocket};
+    /// use openssl::pkey::PKey;
+    /// use std::fs;
+    ///
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let pem = fs::read("path/to/private.pem")?;
+    /// let private_key = PKey::private_key_from_pem(&pem)?;
+    ///
+    /// let ws = KalshiWebSocket::new(
+    ///     TradingEnvironment::DemoMode,
+    ///     "your-key-id",
+    ///     private_key
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// Most users should create the WebSocket client via [`Kalshi::websocket()`](crate::Kalshi::websocket)
+    /// which handles credential transfer automatically.
     pub fn new(trading_env: TradingEnvironment, key_id: &str, private_key: PKey<Private>) -> Self {
         let url = match trading_env {
             TradingEnvironment::DemoMode => "wss://demo-api.kalshi.co/trade-api/ws/v2",
@@ -60,7 +205,42 @@ impl KalshiWebSocket {
         }
     }
 
-    /// Connects to the WebSocket server with authentication.
+    /// Connects to the WebSocket server with automatic authentication.
+    ///
+    /// This method establishes a WebSocket connection to the Kalshi exchange and
+    /// performs RSA-PSS authentication using the provided credentials. The connection
+    /// is authenticated at connection time via query parameters.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())`: Connection established successfully
+    /// - `Err(KalshiError)`: Connection or authentication failed
+    ///
+    /// # Errors
+    ///
+    /// This method can return errors for:
+    /// - Network connectivity issues
+    /// - Invalid credentials (authentication failure)
+    /// - Server unavailability
+    /// - SSL/TLS errors
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// # use kalshi::KalshiWebSocket;
+    /// # async fn example(mut ws: KalshiWebSocket) -> Result<(), Box<dyn std::error::Error>> {
+    /// ws.connect().await?;
+    /// println!("Connected to WebSocket!");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Connection Process
+    ///
+    /// 1. Generates a timestamp and authentication signature
+    /// 2. Constructs the WebSocket URL with authentication parameters
+    /// 3. Establishes the WebSocket connection
+    /// 4. Splits the connection into reader and writer halves for async processing
     pub async fn connect(&mut self) -> Result<(), KalshiError> {
         let timestamp = chrono::Utc::now().timestamp_millis();
         let method = "GET";
@@ -85,7 +265,36 @@ impl KalshiWebSocket {
         Ok(())
     }
 
-    /// Disconnects from the WebSocket server.
+    /// Disconnects from the WebSocket server gracefully.
+    ///
+    /// This method closes the WebSocket connection, clears all subscriptions,
+    /// and resets the client state. After disconnecting, you can call
+    /// [`connect()`](KalshiWebSocket::connect) again to re-establish the connection.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())`: Disconnected successfully
+    /// - `Err(KalshiError)`: Error during disconnection
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// # use kalshi::KalshiWebSocket;
+    /// # async fn example(mut ws: KalshiWebSocket) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Use the connection...
+    /// ws.connect().await?;
+    /// // Do work...
+    ///
+    /// // Clean disconnect when done
+    /// ws.disconnect().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// All active subscriptions are removed when disconnecting. You will need to
+    /// re-subscribe after reconnecting.
     pub async fn disconnect(&mut self) -> Result<(), KalshiError> {
         if let Some(writer) = &self.writer {
             let mut w = writer.lock().await;
@@ -100,7 +309,31 @@ impl KalshiWebSocket {
         Ok(())
     }
 
-    /// Returns true if connected.
+    /// Returns `true` if the WebSocket connection is currently active.
+    ///
+    /// This checks whether the internal writer stream is initialized, which
+    /// indicates an active connection.
+    ///
+    /// # Returns
+    ///
+    /// - `true`: Connected to the WebSocket server
+    /// - `false`: Not connected (either never connected or disconnected)
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// # use kalshi::KalshiWebSocket;
+    /// # async fn example(mut ws: KalshiWebSocket) -> Result<(), Box<dyn std::error::Error>> {
+    /// assert!(!ws.is_connected());
+    ///
+    /// ws.connect().await?;
+    /// assert!(ws.is_connected());
+    ///
+    /// ws.disconnect().await?;
+    /// assert!(!ws.is_connected());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn is_connected(&self) -> bool {
         self.writer.is_some()
     }
@@ -295,7 +528,59 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 impl KalshiWebSocket {
-    /// Returns a stream of WebSocket messages.
+    /// Returns an asynchronous stream of WebSocket messages.
+    ///
+    /// This method provides a [`Stream`](futures_util::Stream) interface for receiving
+    /// messages from the WebSocket connection. The stream yields
+    /// [`WebSocketMessage`](super::WebSocketMessage) items as they arrive.
+    ///
+    /// # Returns
+    ///
+    /// A stream that yields `WebSocketMessage` items. The stream ends when the
+    /// connection is closed.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use kalshi::{KalshiWebSocket, WebSocketMessage};
+    /// use futures_util::StreamExt;
+    ///
+    /// # async fn example(mut ws: KalshiWebSocket) -> Result<(), Box<dyn std::error::Error>> {
+    /// ws.connect().await?;
+    /// ws.subscribe_to_ticker("HIGHNY-24JAN15-T50").await?;
+    ///
+    /// let mut stream = ws.messages();
+    /// while let Some(msg) = stream.next().await {
+    ///     match msg {
+    ///         WebSocketMessage::Ticker(ticker) => {
+    ///             println!("Price update: {}", ticker.last_price);
+    ///         }
+    ///         WebSocketMessage::Heartbeat(_) => {
+    ///             println!("Keepalive heartbeat");
+    ///         }
+    ///         _ => {}
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Message Types
+    ///
+    /// The stream can yield any of these message types:
+    /// - `OrderbookDelta` - Incremental orderbook updates
+    /// - `OrderbookSnapshot` - Full orderbook snapshots
+    /// - `Ticker` - Best bid/ask and last price updates
+    /// - `Trade` / `Trades` - Trade executions
+    /// - `Fill` - Your order fills (authenticated)
+    /// - `Order` - Your order updates (authenticated)
+    /// - `Heartbeat` - Keepalive messages
+    /// - `Subscribed` / `Ok` / `Error` - Control messages
+    ///
+    /// # Performance
+    ///
+    /// The stream processes messages as they arrive. Control messages (subscribed, ok, error)
+    /// are automatically routed to pending command handlers and also yielded to the stream.
     pub fn messages(&mut self) -> impl Stream<Item = super::WebSocketMessage> + '_ {
         MessageStream { ws: self }
     }

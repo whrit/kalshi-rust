@@ -1,3 +1,310 @@
+//! Portfolio management and trading operations.
+//!
+//! This module provides comprehensive access to the Kalshi trading API, allowing you to
+//! place orders, manage positions, track fills, and monitor your portfolio. All portfolio
+//! operations require authentication.
+//!
+//! # Overview
+//!
+//! The portfolio module is the core of trading on Kalshi. It encompasses:
+//!
+//! - **Order Management**: Create, cancel, amend, and query orders
+//! - **Position Tracking**: Monitor your holdings across markets and events
+//! - **Fill History**: Track executed trades and transaction history
+//! - **Balance Queries**: Check your account balance
+//! - **Batch Operations**: Execute multiple orders or cancellations in a single request
+//! - **Order Groups**: Manage related orders with shared limits
+//!
+//! # Quick Start - Placing an Order
+//!
+//! ```rust,ignore
+//! use kalshi::{Kalshi, TradingEnvironment, Action, Side, OrderType};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let kalshi = Kalshi::new(
+//!     TradingEnvironment::DemoMode,
+//!     "your-key-id",
+//!     "path/to/private.pem"
+//! ).await?;
+//!
+//! // Place a limit order to buy 10 YES contracts at 55 cents
+//! let order = kalshi.create_order(
+//!     Action::Buy,           // Buy or Sell
+//!     None,                  // client_order_id (auto-generated if None)
+//!     10,                    // count (number of contracts)
+//!     Side::Yes,             // Yes or No
+//!     "HIGHNY-24JAN15-T50".to_string(),  // ticker
+//!     OrderType::Limit,      // Market or Limit
+//!     None,                  // buy_max_cost
+//!     None,                  // expiration_ts
+//!     Some(55),              // yes_price (cents)
+//!     None,                  // no_price
+//!     None,                  // sell_position_floor
+//!     None,                  // yes_price_dollars
+//!     None,                  // no_price_dollars
+//!     None,                  // time_in_force
+//!     None,                  // post_only
+//!     None,                  // reduce_only
+//!     None,                  // self_trade_prevention_type
+//!     None,                  // order_group_id
+//!     None,                  // cancel_order_on_pause
+//! ).await?;
+//!
+//! println!("Order created: {}", order.order_id);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Key Concepts
+//!
+//! ## Order Types
+//!
+//! - **Limit Orders**: Specify a price; order only executes at that price or better
+//! - **Market Orders**: Execute immediately at the current market price
+//!
+//! ## Order Sides
+//!
+//! - **Yes**: Betting that the event will occur
+//! - **No**: Betting that the event will not occur
+//!
+//! ## Pricing
+//!
+//! Prices can be specified in two ways:
+//! - **Cents**: Integer values (0-100), e.g., `yes_price: Some(55)` means 55 cents
+//! - **Dollars**: String values (0.00-1.00), e.g., `yes_price_dollars: Some("0.55")`
+//!
+//! ## Order Status Lifecycle
+//!
+//! 1. **Pending**: Order submitted but not yet confirmed
+//! 2. **Resting**: Order is active in the orderbook
+//! 3. **Executed**: Order completely filled
+//! 4. **Canceled**: Order canceled before complete execution
+//!
+//! # Common Workflows
+//!
+//! ## Check Your Balance
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let balance_cents = kalshi.get_balance().await?;
+//! println!("Balance: ${:.2}", balance_cents as f64 / 100.0);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## View Your Open Orders
+//!
+//! ```rust,ignore
+//! # use kalshi::{Kalshi, OrderStatus};
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let (cursor, orders) = kalshi.get_orders(
+//!     None,                        // ticker filter
+//!     None,                        // event_ticker filter
+//!     None,                        // min_ts
+//!     None,                        // max_ts
+//!     Some(OrderStatus::Resting),  // only resting orders
+//!     Some(100),                   // limit
+//!     None,                        // cursor
+//! ).await?;
+//!
+//! for order in orders {
+//!     println!("Order {}: {} {} @ {}",
+//!         order.order_id,
+//!         order.count.unwrap_or(0),
+//!         order.ticker,
+//!         order.yes_price.unwrap_or(0)
+//!     );
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Cancel an Order
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let order_id = "some-order-id";
+//! let (canceled_order, reduced_by) = kalshi.cancel_order(order_id).await?;
+//! println!("Canceled {} contracts", reduced_by);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## View Your Positions
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let (cursor, event_positions, market_positions) = kalshi.get_positions(
+//!     Some(50),  // limit
+//!     None,      // cursor
+//!     None,      // settlement_status
+//!     None,      // ticker
+//!     None,      // event_ticker
+//!     None,      // count_filter
+//! ).await?;
+//!
+//! for position in market_positions {
+//!     println!("Position: {} contracts in {}",
+//!         position.position,
+//!         position.ticker
+//!     );
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Track Your Fills
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let (cursor, fills) = kalshi.get_fills(
+//!     None,      // ticker
+//!     None,      // order_id
+//!     None,      // min_ts
+//!     None,      // max_ts
+//!     Some(20),  // limit
+//!     None,      // cursor
+//! ).await?;
+//!
+//! for fill in fills {
+//!     println!("Fill: {} {} contracts on {} at {} cents",
+//!         fill.action,
+//!         fill.count,
+//!         fill.ticker,
+//!         fill.yes_price
+//!     );
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Advanced Features
+//!
+//! ## Batch Operations
+//!
+//! Create or cancel multiple orders in a single API call for better performance:
+//!
+//! ```rust,ignore
+//! # use kalshi::{Kalshi, OrderCreationField, Action, Side, OrderType};
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let orders = vec![
+//!     OrderCreationField {
+//!         action: Action::Buy,
+//!         count: 5,
+//!         side: Side::Yes,
+//!         ticker: "MARKET-1".to_string(),
+//!         input_type: OrderType::Limit,
+//!         yes_price: Some(50),
+//!         // ... other fields
+//!         # client_order_id: None,
+//!         # buy_max_cost: None,
+//!         # expiration_ts: None,
+//!         # no_price: None,
+//!         # sell_position_floor: None,
+//!         # yes_price_dollars: None,
+//!         # no_price_dollars: None,
+//!         # time_in_force: None,
+//!         # post_only: None,
+//!         # reduce_only: None,
+//!         # self_trade_prevention_type: None,
+//!         # order_group_id: None,
+//!         # cancel_order_on_pause: None,
+//!     },
+//!     // ... more orders (up to 20 per batch)
+//! ];
+//!
+//! let results = kalshi.batch_create_order(orders).await?;
+//! for (i, result) in results.iter().enumerate() {
+//!     match result {
+//!         Ok(order) => println!("Order {}: Created {}", i, order.order_id),
+//!         Err(e) => println!("Order {}: Failed - {:?}", i, e),
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Order Groups
+//!
+//! Manage related orders with shared contract limits:
+//!
+//! ```rust,ignore
+//! # use kalshi::Kalshi;
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! // Create an order group with a 100-contract limit
+//! let group = kalshi.create_order_group(100).await?;
+//!
+//! // Orders in this group will share the 100-contract limit
+//! let order = kalshi.create_order(
+//!     // ... order parameters ...
+//!     # kalshi::Action::Buy,
+//!     # None,
+//!     # 10,
+//!     # kalshi::Side::Yes,
+//!     # "TICKER".to_string(),
+//!     # kalshi::OrderType::Limit,
+//!     # None, None, Some(50), None, None, None, None, None, None, None, None,
+//!     Some(group.id.clone()),  // order_group_id
+//!     None,
+//! ).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Amend Orders
+//!
+//! Modify price or quantity without canceling and re-creating:
+//!
+//! ```rust,ignore
+//! # use kalshi::{Kalshi, Side, Action};
+//! # async fn example(kalshi: &Kalshi) -> Result<(), Box<dyn std::error::Error>> {
+//! let response = kalshi.amend_order(
+//!     "order-id",
+//!     "TICKER",
+//!     Side::Yes,
+//!     Action::Buy,
+//!     "original-client-id",
+//!     "updated-client-id",
+//!     Some(60),  // new yes_price
+//!     None,      // no_price
+//!     None,      // yes_price_dollars
+//!     None,      // no_price_dollars
+//!     Some(15),  // new count
+//! ).await?;
+//!
+//! println!("Amended order from {} to {}", response.old_order.order_id, response.order.order_id);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Error Handling
+//!
+//! All portfolio methods return `Result<T, KalshiError>`. Common errors include:
+//!
+//! - **UserInputError**: Invalid parameters (e.g., both yes_price and no_price specified)
+//! - **HttpError**: Network or API errors
+//! - **InternalError**: Unexpected conditions
+//!
+//! # Best Practices
+//!
+//! 1. **Check balance before trading**: Use `get_balance()` to ensure sufficient funds
+//! 2. **Use limit orders**: For better price control (market orders may have unfavorable execution)
+//! 3. **Monitor fills**: Subscribe to fill notifications via WebSocket for real-time updates
+//! 4. **Use batch operations**: When placing/canceling multiple orders for better performance
+//! 5. **Set expiration times**: For orders that should only be active during specific periods
+//!
+//! # See Also
+//!
+//! - [`create_order`](crate::Kalshi::create_order) - Place a new order
+//! - [`get_orders`](crate::Kalshi::get_orders) - Query your orders
+//! - [`cancel_order`](crate::Kalshi::cancel_order) - Cancel an order
+//! - [`get_positions`](crate::Kalshi::get_positions) - View your positions
+//! - [`get_fills`](crate::Kalshi::get_fills) - Track your fills
+
 use super::Kalshi;
 use crate::kalshi_error::*;
 use std::fmt;

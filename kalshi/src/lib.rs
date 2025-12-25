@@ -10,10 +10,10 @@
 //!
 //! ## The Kalshi Struct
 //!
-//! The [Kalshi](Kalshi) struct is the central component of this crate.
+//! The [`Kalshi`] struct is the central component of this crate.
 //! All authentication, order routing, market requests, and position snapshots are handled through the struct and its methods.
 //!
-//! For more details, see [Kalshi](Kalshi).
+//! For more details, see [`Kalshi`].
 //!
 //! For a quick tutorial / beginners guide, jump [here](#quick-start-guide).
 //!
