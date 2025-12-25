@@ -239,11 +239,14 @@ impl Kalshi {
             client: reqwest::Client::new(),
         };
 
-        // Verify authentication by hitting the exchange status endpoint
-        println!("Verifying authentication with exchange status endpoint...");
-        match kalshi.get_exchange_status().await {
-            Ok(status) => {
-                println!("Authentication successful! Exchange status: {:?}", status);
+        // Verify authentication by hitting an authenticated endpoint (balance)
+        println!("Verifying authentication with balance endpoint...");
+        match kalshi.get_balance().await {
+            Ok(balance) => {
+                println!(
+                    "Authentication successful! Account balance: {} cents",
+                    balance
+                );
                 Ok(kalshi)
             }
             Err(e) => {

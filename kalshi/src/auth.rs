@@ -106,8 +106,29 @@ impl Kalshi {
             builder.json(b).send().await?
         } else {
             builder.send().await?
+        };
+
+        // Check status and provide detailed error messages for authentication failures
+        let status = resp.status();
+        if !status.is_success() {
+            let body_text = resp.text().await.unwrap_or_default();
+            if status.as_u16() == 401 {
+                return Err(KalshiError::Auth(format!(
+                    "Authentication failed (401): {}. Check your API key and ensure the private key matches.",
+                    body_text
+                )));
+            } else if status.is_client_error() {
+                return Err(KalshiError::UserInputError(format!(
+                    "Request failed with status {}: {}",
+                    status, body_text
+                )));
+            } else {
+                return Err(KalshiError::InternalError(format!(
+                    "Server error {}: {}",
+                    status, body_text
+                )));
+            }
         }
-        .error_for_status()?;
 
         Ok(resp.json::<T>().await?)
     }
