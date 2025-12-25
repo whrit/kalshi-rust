@@ -370,6 +370,7 @@ impl Kalshi {
     /// ).await.unwrap();
     /// ```
     ///
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_orders(
         &self,
         ticker: Option<String>,
@@ -767,6 +768,7 @@ impl Kalshi {
     /// ).await.unwrap();
     /// ```
     // TODO: rewrite using generics
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_order(
         &self,
         action: Action,
@@ -1174,6 +1176,7 @@ impl Kalshi {
     /// ).await.unwrap();
     /// ```
     ///
+    #[allow(clippy::too_many_arguments)]
     pub async fn amend_order(
         &self,
         order_id: &str,

@@ -1105,6 +1105,7 @@ struct MarketListResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Used by serde for deserialization
 struct SeriesListResponse {
     cursor: Option<String>,
     #[serde(default)]
@@ -1118,6 +1119,7 @@ struct TradeListResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // cursor field reserved for future pagination support
 struct CandlestickListResponse {
     cursor: Option<String>,
     candlesticks: Vec<Candle>,

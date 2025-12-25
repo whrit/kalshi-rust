@@ -34,6 +34,7 @@ impl Kalshi {
     /// ).await.unwrap();
     /// ```
     ///
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_events(
         &self,
         limit: Option<i64>,
@@ -266,6 +267,7 @@ struct EventListResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Used by serde for deserialization
 struct SingleEventResponse {
     event: Event,
 }
