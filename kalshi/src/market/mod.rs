@@ -20,6 +20,11 @@ impl Kalshi {
     /// * `tickers` - An optional string to filter markets by specific tickers.
     /// * `min_close_ts` - An optional minimum timestamp for market close time.
     /// * `max_close_ts` - An optional maximum timestamp for market close time.
+    /// * `min_created_ts` - An optional minimum timestamp for market creation time.
+    /// * `max_created_ts` - An optional maximum timestamp for market creation time.
+    /// * `min_settled_ts` - An optional minimum timestamp for market settlement time.
+    /// * `max_settled_ts` - An optional maximum timestamp for market settlement time.
+    /// * `mve_filter` - An optional filter for multivariate events (Only or Exclude).
     ///
     /// # Returns
     ///
@@ -33,10 +38,11 @@ impl Kalshi {
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
     /// let (cursor, markets) = kalshi_instance.get_markets(
     ///     Some(10), None, Some("SOME-EVENT".to_string()), None,
-    ///     Some("open".to_string()), None, None, None
+    ///     Some("open".to_string()), None, None, None, None, None, None, None, None
     /// ).await.unwrap();
     /// ```
     ///
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_markets(
         &self,
         limit: Option<i64>,
@@ -47,6 +53,11 @@ impl Kalshi {
         tickers: Option<String>,
         min_close_ts: Option<i64>,
         max_close_ts: Option<i64>,
+        min_created_ts: Option<i64>,
+        max_created_ts: Option<i64>,
+        min_settled_ts: Option<i64>,
+        max_settled_ts: Option<i64>,
+        mve_filter: Option<MveFilter>,
     ) -> Result<(Option<String>, Vec<Market>), KalshiError> {
         let url = format!("{}/markets", self.base_url);
         let mut p = vec![];
@@ -58,6 +69,11 @@ impl Kalshi {
         add_param!(p, "tickers", tickers);
         add_param!(p, "min_close_ts", min_close_ts);
         add_param!(p, "max_close_ts", max_close_ts);
+        add_param!(p, "min_created_ts", min_created_ts);
+        add_param!(p, "max_created_ts", max_created_ts);
+        add_param!(p, "min_settled_ts", min_settled_ts);
+        add_param!(p, "max_settled_ts", max_settled_ts);
+        add_param!(p, "mve_filter", mve_filter);
 
         let res: MarketListResponse = self
             .client
@@ -253,6 +269,70 @@ impl Kalshi {
             .json()
             .await?;
         Ok(res.candlesticks)
+    }
+
+    /// Retrieves candlestick data for multiple markets in a single request.
+    ///
+    /// This method fetches historical price data in candlestick format for multiple markets
+    /// simultaneously, which is more efficient than making individual requests for each market.
+    ///
+    /// # Arguments
+    ///
+    /// * `market_tickers` - A vector of market ticker identifiers (max 100)
+    /// * `start_ts` - Start timestamp in Unix seconds
+    /// * `end_ts` - End timestamp in Unix seconds
+    /// * `period_interval` - Candlestick period in minutes (must be 1, 60, or 1440)
+    /// * `include_latest_before_start` - If true, prepends the latest candlestick before start_ts
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Vec<MarketCandlesticks>)`: A vector of `MarketCandlesticks` objects, one per market
+    /// - `Err(KalshiError)`: An error if there is an issue with the request
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let tickers = vec!["MARKET-1".to_string(), "MARKET-2".to_string()];
+    /// let now = chrono::Utc::now().timestamp();
+    /// let start = now - 86400; // 1 day ago
+    /// let candlesticks = kalshi_instance.batch_get_market_candlesticks(
+    ///     tickers, start, now, 60, None
+    /// ).await.unwrap();
+    /// ```
+    ///
+    pub async fn batch_get_market_candlesticks(
+        &self,
+        market_tickers: Vec<String>,
+        start_ts: i64,
+        end_ts: i64,
+        period_interval: i32,
+        include_latest_before_start: Option<bool>,
+    ) -> Result<Vec<MarketCandlesticks>, KalshiError> {
+        let url = format!("{}/markets/candlesticks/batch", self.base_url);
+
+        // Join tickers with commas as required by the API
+        let tickers_param = market_tickers.join(",");
+
+        let mut p = vec![
+            ("market_tickers", tickers_param),
+            ("start_ts", start_ts.to_string()),
+            ("end_ts", end_ts.to_string()),
+            ("period_interval", period_interval.to_string()),
+        ];
+
+        if let Some(include_latest) = include_latest_before_start {
+            p.push(("include_latest_before_start", include_latest.to_string()));
+        }
+
+        let res: BatchCandlestickResponse = self
+            .client
+            .get(reqwest::Url::parse_with_params(&url, &p)?)
+            .send()
+            .await?
+            .json()
+            .await?;
+        Ok(res.markets)
     }
 
     /// Retrieves a list of trades from the Kalshi exchange based on specified criteria.
@@ -667,6 +747,39 @@ pub enum MarketStatus {
     Settled,
 }
 
+/// Filter for multivariate events (MVE) in market queries.
+///
+/// This enum allows filtering markets based on whether they belong to
+/// multivariate event collections.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MveFilter {
+    /// Only include markets that are part of multivariate events
+    Only,
+    /// Exclude markets that are part of multivariate events
+    Exclude,
+}
+
+impl std::fmt::Display for MveFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MveFilter::Only => write!(f, "only"),
+            MveFilter::Exclude => write!(f, "exclude"),
+        }
+    }
+}
+
+/// Represents candlestick data for a specific market in batch responses.
+///
+/// Contains the market ticker and its associated candlestick data.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MarketCandlesticks {
+    /// The market ticker identifier
+    pub ticker: String,
+    /// The candlestick data for this market
+    pub candlesticks: Vec<Candle>,
+}
+
 /// Represents a settlement source for a series.
 ///
 /// Settlement sources provide the data or methodology used to determine
@@ -719,4 +832,9 @@ struct SingleSeriesResponse {
 #[derive(Debug, Deserialize)]
 struct OrderbookResponse {
     orderbook: Orderbook,
+}
+
+#[derive(Debug, Deserialize)]
+struct BatchCandlestickResponse {
+    markets: Vec<MarketCandlesticks>,
 }

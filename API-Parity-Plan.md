@@ -10,6 +10,12 @@ dependency.
 ✅ **Phase 1 Complete** - All 23 tests passing in `kalshi/tests/phase1_api_parity_tests.rs`
 - Run with: `cargo test --test phase1_api_parity_tests`
 
+✅ **Phase 2 Complete** - Task 2.3 (get_communications_id) implemented
+
+✅ **Phase 3 Complete** - All 6 tests passing in `kalshi/tests/communications_tests.rs`
+- Run with: `cargo test --test communications_tests`
+- Tests cover: get_communications_id, create_rfq, create_quote, get_rfqs, get_quotes, accept_quote
+
 ## Progress Tracking
 
 ### Phase 1: Critical Trading Features (HTTPS Fixes) - ✅ COMPLETE
@@ -20,6 +26,24 @@ dependency.
 | 1.2 Fix amend_order() - Complete Rewrite | ✅ Done | New signature with price validation, returns AmendOrderResponse |
 | 1.3 Update get_settlements() - Add Missing Filters | ✅ Done | Added ticker, event_ticker, min_ts, max_ts parameters |
 | 1.4 Update get_positions() - Add count_filter | ✅ Done | Added count_filter parameter |
+
+### Phase 2: Missing HTTPS Endpoints - COMPLETE
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 2.1 Add batch_get_market_candlesticks() | ✅ Done | Added in market/mod.rs with MarketCandlesticks struct |
+| 2.2 Add get_multivariate_events() | ✅ Done | Added in events/mod.rs with validation for mutually exclusive filters |
+| 2.3 Add get_communications_id() | ✅ Done | Added in communications/mod.rs, returns user's public communications ID |
+| 2.4 Update get_markets() - Add Missing Query Params | ✅ Done | Added timestamp filters and MveFilter enum |
+
+### Phase 3: RFQ/Quote API Alignment - COMPLETE
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 3.1 Rewrite create_rfq() | ✅ Done | New signature with market_ticker, rest_remainder, contracts, target_cost_centi_cents, replace_existing, subtrader_id |
+| 3.2 Rewrite create_quote() | ✅ Done | New signature with rfq_id, yes_bid, no_bid, rest_remainder (dollar format) |
+| 3.3 Update get_rfqs() and get_quotes() | ✅ Done | Added pagination (cursor, limit) and filtering parameters |
+| 3.4 Fix accept_quote() | ✅ Done | Added accepted_side parameter (Side enum), returns () |
 
 ---
 Phase 1: Critical Trading Features (HTTPS Fixes) - COMPLETE
