@@ -17,7 +17,7 @@ struct SingleMilestoneResponse {
     milestone: Milestone,
 }
 
-impl<'a> Kalshi {
+impl Kalshi {
     /// GET `/milestones`
     pub async fn get_milestones(
         &self,

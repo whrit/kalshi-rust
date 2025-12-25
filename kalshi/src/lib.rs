@@ -36,7 +36,7 @@
 //! Initialize the Kalshi Struct with key-based authentication:
 //! - **IMPORTANT**:  The authentication is handled automatically when creating a new instance.
 //! - Store your key ID and private key file securely, an implementation of extracting these from local environmental variables
-//! is available [here](https://github.com/dpeachpeach/kalshi-rust/blob/main/sample_bot/src/main.rs#L12)
+//!   is available [here](https://github.com/dpeachpeach/kalshi-rust/blob/main/sample_bot/src/main.rs#L12)
 //! ```
 //! use kalshi::Kalshi;
 //! use kalshi::TradingEnvironment;
@@ -145,7 +145,6 @@ pub use structured_targets::*;
 
 // imports
 use openssl::pkey::{PKey, Private};
-use reqwest;
 use std::fs;
 use std::path::Path;
 

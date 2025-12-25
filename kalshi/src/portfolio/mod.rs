@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 const PORTFOLIO_PATH: &str = "/portfolio";
 
-impl<'a> Kalshi {
+impl Kalshi {
     /// Retrieves the current balance of the authenticated user from the Kalshi exchange.
     ///
     /// This method fetches the user's balance, requiring a valid authentication token.
@@ -95,7 +95,7 @@ impl<'a> Kalshi {
         };
 
         let result: MultipleOrderResponse = self.signed_get(&path).await?;
-        return Ok((result.cursor, result.orders));
+        Ok((result.cursor, result.orders))
     }
 
     /// Retrieves detailed information about a specific order from the Kalshi exchange.
@@ -123,7 +123,7 @@ impl<'a> Kalshi {
     pub async fn get_single_order(&self, order_id: &String) -> Result<Order, KalshiError> {
         let path = format!("{}/orders/{}", PORTFOLIO_PATH, order_id);
         let result: SingleOrderResponse = self.signed_get(&path).await?;
-        return Ok(result.order);
+        Ok(result.order)
     }
 
     /// Cancels an existing order on the Kalshi exchange.
@@ -209,8 +209,8 @@ impl<'a> Kalshi {
         }
 
         let decrease_payload = DecreaseOrderPayload {
-            reduce_by: reduce_by,
-            reduce_to: reduce_to,
+            reduce_by,
+            reduce_to,
         };
 
         // v2 portfolio API: POST /orders/{order_id}/decrease
@@ -281,7 +281,7 @@ impl<'a> Kalshi {
         };
 
         let result: MultipleFillsResponse = self.signed_get(&path).await?;
-        return Ok((result.cursor, result.fills));
+        Ok((result.cursor, result.fills))
     }
 
     /// Retrieves a list of portfolio settlements from the Kalshi exchange.
@@ -459,8 +459,6 @@ impl<'a> Kalshi {
     ///     Some(100)
     /// ).await.unwrap();
     /// ```
-    ///
-
     // TODO: rewrite using generics
     pub async fn create_order(
         &self,
@@ -485,42 +483,39 @@ impl<'a> Kalshi {
         order_group_id: Option<String>,
         cancel_order_on_pause: Option<bool>,
     ) -> Result<Order, KalshiError> {
-        match input_type {
-            OrderType::Limit => {
-                // Check if user provided both cent and dollar prices for the same side
-                if yes_price.is_some() && yes_price_dollars.is_some() {
-                    return Err(KalshiError::UserInputError(
-                        "Cannot provide both yes_price and yes_price_dollars".to_string(),
-                    ));
-                }
-                if no_price.is_some() && no_price_dollars.is_some() {
-                    return Err(KalshiError::UserInputError(
-                        "Cannot provide both no_price and no_price_dollars".to_string(),
-                    ));
-                }
-
-                // Check if any price is provided
-                let has_price = yes_price.is_some()
-                    || no_price.is_some()
-                    || yes_price_dollars.is_some()
-                    || no_price_dollars.is_some();
-
-                if !has_price {
-                    return Err(KalshiError::UserInputError(
-                        "Must provide a price (yes_price, no_price, yes_price_dollars, or no_price_dollars)".to_string(),
-                    ));
-                }
-
-                // Check if both yes and no prices are provided
-                let has_yes = yes_price.is_some() || yes_price_dollars.is_some();
-                let has_no = no_price.is_some() || no_price_dollars.is_some();
-                if has_yes && has_no {
-                    return Err(KalshiError::UserInputError(
-                        "Can only provide yes price or no price, not both".to_string(),
-                    ));
-                }
+        if let OrderType::Limit = input_type {
+            // Check if user provided both cent and dollar prices for the same side
+            if yes_price.is_some() && yes_price_dollars.is_some() {
+                return Err(KalshiError::UserInputError(
+                    "Cannot provide both yes_price and yes_price_dollars".to_string(),
+                ));
             }
-            _ => {}
+            if no_price.is_some() && no_price_dollars.is_some() {
+                return Err(KalshiError::UserInputError(
+                    "Cannot provide both no_price and no_price_dollars".to_string(),
+                ));
+            }
+
+            // Check if any price is provided
+            let has_price = yes_price.is_some()
+                || no_price.is_some()
+                || yes_price_dollars.is_some()
+                || no_price_dollars.is_some();
+
+            if !has_price {
+                return Err(KalshiError::UserInputError(
+                    "Must provide a price (yes_price, no_price, yes_price_dollars, or no_price_dollars)".to_string(),
+                ));
+            }
+
+            // Check if both yes and no prices are provided
+            let has_yes = yes_price.is_some() || yes_price_dollars.is_some();
+            let has_no = no_price.is_some() || no_price_dollars.is_some();
+            if has_yes && has_no {
+                return Err(KalshiError::UserInputError(
+                    "Can only provide yes price or no price, not both".to_string(),
+                ));
+            }
         }
 
         let unwrapped_id = match client_order_id {

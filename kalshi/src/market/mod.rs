@@ -3,7 +3,7 @@ use crate::kalshi_error::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
-impl<'a> Kalshi {
+impl Kalshi {
     /// Retrieves a list of markets from the Kalshi exchange based on specified criteria.
     ///
     /// This method fetches multiple markets, allowing for filtering by event ticker, series ticker,
