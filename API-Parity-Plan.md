@@ -5,6 +5,12 @@ Overview
 This plan brings the kalshi-rust library to 100% parity with the Kalshi REST API and WebSocket API. The implementation is organized into 4 phases, ordered by priority and
 dependency.
 
+## Test Status
+
+✅ **Phase 1 Tests Written** - Comprehensive TDD tests in `kalshi/tests/phase1_api_parity_tests.rs`
+- Tests will fail until implementation is complete (TDD approach)
+- Run with: `cargo test --test phase1_api_parity_tests`
+
 ---
 Phase 1: Critical Trading Features (HTTPS Fixes)
 
