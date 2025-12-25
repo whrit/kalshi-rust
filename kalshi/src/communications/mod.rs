@@ -430,7 +430,11 @@ impl Kalshi {
     /// kalshi_instance.accept_quote("quote-123", Side::Yes).await.unwrap();
     /// ```
     ///
-    pub async fn accept_quote(&self, quote_id: &str, accepted_side: Side) -> Result<(), KalshiError> {
+    pub async fn accept_quote(
+        &self,
+        quote_id: &str,
+        accepted_side: Side,
+    ) -> Result<(), KalshiError> {
         let path = format!("/communications/quotes/{}/accept", quote_id);
         let body = AcceptQuoteRequest { accepted_side };
         let _: serde_json::Value = self.signed_put(&path, Some(&body)).await?;

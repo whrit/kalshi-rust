@@ -126,6 +126,7 @@ mod milestone;
 mod portfolio;
 mod search;
 mod structured_targets;
+mod websocket;
 
 // pub use auth::*;  // Unused import
 pub use api_keys::*;
@@ -142,6 +143,7 @@ pub use milestone::*;
 pub use portfolio::*;
 pub use search::*;
 pub use structured_targets::*;
+pub use websocket::*;
 
 // imports
 use openssl::pkey::{PKey, Private};
@@ -249,6 +251,20 @@ impl Kalshi {
                 eprintln!("Please check your API key and private key file");
                 Err(e)
             }
+        }
+    }
+
+    /// Creates a new WebSocket client using the same credentials.
+    pub fn websocket(&self) -> websocket::KalshiWebSocket {
+        websocket::KalshiWebSocket::new(self.trading_env(), &self.key_id, self.private_key.clone())
+    }
+
+    /// Returns the current trading environment.
+    pub fn trading_env(&self) -> TradingEnvironment {
+        if self.base_url.contains("demo") {
+            TradingEnvironment::DemoMode
+        } else {
+            TradingEnvironment::ProdMode
         }
     }
 }

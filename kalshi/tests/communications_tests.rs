@@ -43,14 +43,7 @@ async fn test_create_rfq_signature() {
     // This tests the method signature exists, actual API call may fail
     // due to invalid market ticker
     let result = kalshi
-        .create_rfq(
-            "INVALID-MARKET",
-            false,
-            Some(10),
-            None,
-            None,
-            None,
-        )
+        .create_rfq("INVALID-MARKET", false, Some(10), None, None, None)
         .await;
 
     // We expect this to fail due to invalid market ticker, but method should exist

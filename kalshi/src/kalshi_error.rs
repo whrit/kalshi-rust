@@ -155,3 +155,9 @@ impl From<serde_urlencoded::ser::Error> for KalshiError {
         KalshiError::UserInputError(format!("URL Encoding Error: {}", err))
     }
 }
+
+impl From<serde_json::Error> for KalshiError {
+    fn from(err: serde_json::Error) -> Self {
+        KalshiError::InternalError(format!("JSON Error: {}", err))
+    }
+}

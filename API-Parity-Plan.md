@@ -16,6 +16,10 @@ dependency.
 - Run with: `cargo test --test communications_tests`
 - Tests cover: get_communications_id, create_rfq, create_quote, get_rfqs, get_quotes, accept_quote
 
+✅ **Phase 4 Complete** - WebSocket implementation with 4 unit tests
+- Run with: `cargo test websocket::channels --lib`
+- Tests cover: Channel Display, requires_auth, serialization, deserialization
+
 ## Progress Tracking
 
 ### Phase 1: Critical Trading Features (HTTPS Fixes) - ✅ COMPLETE
@@ -44,6 +48,19 @@ dependency.
 | 3.2 Rewrite create_quote() | ✅ Done | New signature with rfq_id, yes_bid, no_bid, rest_remainder (dollar format) |
 | 3.3 Update get_rfqs() and get_quotes() | ✅ Done | Added pagination (cursor, limit) and filtering parameters |
 | 3.4 Fix accept_quote() | ✅ Done | Added accepted_side parameter (Side enum), returns () |
+
+### Phase 4: WebSocket Implementation - COMPLETE
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 4.1 Add Dependencies | ✅ Done | Added tokio-tungstenite 0.21, futures-util 0.3 to Cargo.toml |
+| 4.2 Create WebSocket Module Structure | ✅ Done | Created websocket/mod.rs with submodule declarations |
+| 4.3 Connection Handler | ✅ Done | Created connection.rs with KalshiWebSocket, auth, connect/disconnect |
+| 4.4 Channel Definitions | ✅ Done | Created channels.rs with Channel enum (9 channels), Display, requires_auth() |
+| 4.5 Message Types | ✅ Done | Created messages.rs with 15+ message types, WebSocketMessage::parse() |
+| 4.6 Subscription Management | ✅ Done | Created subscription.rs with subscribe/unsubscribe/update methods |
+| 4.7 Stream Interface | ✅ Done | Added Stream trait impl for async message polling in connection.rs |
+| 4.8 Integration with Kalshi Struct | ✅ Done | Added websocket() factory and trading_env() to lib.rs |
 
 ---
 Phase 1: Critical Trading Features (HTTPS Fixes) - COMPLETE
