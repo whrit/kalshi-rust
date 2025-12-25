@@ -1,7 +1,7 @@
 //! collection.rs – wrappers for Kalshi Trade API → collection (multivariate)
+use crate::{kalshi_error::*, Kalshi};
 use serde::Deserialize;
 use serde_json::Value;
-use crate::{Kalshi, kalshi_error::*};
 
 impl Kalshi {
     /// Retrieves a list of multivariate event collections from the Kalshi exchange.
@@ -40,7 +40,10 @@ impl Kalshi {
         let path = if p.is_empty() {
             "/multivariate_event_collections".to_string()
         } else {
-            format!("/multivariate_event_collections?{}", serde_urlencoded::to_string(&p)?)
+            format!(
+                "/multivariate_event_collections?{}",
+                serde_urlencoded::to_string(&p)?
+            )
         };
         let res: CollectionListResponse = self.signed_get(&path).await?;
         Ok((res.cursor, res.multivariate_event_collections))

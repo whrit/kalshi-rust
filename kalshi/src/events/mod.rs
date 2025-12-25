@@ -122,7 +122,10 @@ impl Kalshi {
         end_ts: Option<i64>,
         period_interval: Option<String>,
     ) -> Result<Vec<Candlestick>, KalshiError> {
-        let path = format!("/series/{}/events/{}/candlesticks", series_ticker, event_ticker);
+        let path = format!(
+            "/series/{}/events/{}/candlesticks",
+            series_ticker, event_ticker
+        );
         let mut params = vec![];
         add_param!(params, "start_ts", start_ts);
         add_param!(params, "end_ts", end_ts);
@@ -155,7 +158,10 @@ impl Kalshi {
     /// let metadata = kalshi_instance.get_event_metadata("EVENT-TICKER").await.unwrap();
     /// ```
     ///
-    pub async fn get_event_metadata(&self, event_ticker: &str) -> Result<EventMetadata, KalshiError> {
+    pub async fn get_event_metadata(
+        &self,
+        event_ticker: &str,
+    ) -> Result<EventMetadata, KalshiError> {
         let path = format!("/events/{}/metadata", event_ticker);
         self.signed_get(&path).await
     }
@@ -250,4 +256,3 @@ pub struct ForecastDataPoint {
     /// Forecast percentile values.
     pub percentiles: std::collections::HashMap<String, f64>,
 }
-

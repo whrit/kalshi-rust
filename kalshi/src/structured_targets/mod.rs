@@ -45,7 +45,10 @@ impl Kalshi {
     /// let target = kalshi_instance.get_structured_target("target-123").await.unwrap();
     /// ```
     ///
-    pub async fn get_structured_target(&self, target_id: &str) -> Result<StructuredTarget, KalshiError> {
+    pub async fn get_structured_target(
+        &self,
+        target_id: &str,
+    ) -> Result<StructuredTarget, KalshiError> {
         let path = format!("/structured_targets/{}", target_id);
         let res: StructuredTargetResponse = self.signed_get(&path).await?;
         Ok(res.target)
@@ -77,4 +80,3 @@ pub struct StructuredTarget {
     #[serde(flatten)]
     pub details: std::collections::HashMap<String, serde_json::Value>,
 }
-

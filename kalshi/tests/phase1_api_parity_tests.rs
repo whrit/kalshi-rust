@@ -9,7 +9,7 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use kalshi::{Action, OrderType, Side, KalshiError};
+use kalshi::{Action, KalshiError, OrderType, Side};
 use serde_json;
 
 // =============================================================================
@@ -29,17 +29,26 @@ fn test_time_in_force_enum_serialization() {
     let gtc_json = serde_json::to_string(&gtc).expect("Failed to serialize GoodTillCanceled");
     let ioc_json = serde_json::to_string(&ioc).expect("Failed to serialize ImmediateOrCancel");
 
-    assert_eq!(fok_json, "\"fill_or_kill\"", "FillOrKill should serialize to snake_case");
-    assert_eq!(gtc_json, "\"good_till_canceled\"", "GoodTillCanceled should serialize to snake_case");
-    assert_eq!(ioc_json, "\"immediate_or_cancel\"", "ImmediateOrCancel should serialize to snake_case");
+    assert_eq!(
+        fok_json, "\"fill_or_kill\"",
+        "FillOrKill should serialize to snake_case"
+    );
+    assert_eq!(
+        gtc_json, "\"good_till_canceled\"",
+        "GoodTillCanceled should serialize to snake_case"
+    );
+    assert_eq!(
+        ioc_json, "\"immediate_or_cancel\"",
+        "ImmediateOrCancel should serialize to snake_case"
+    );
 }
 
 #[test]
 fn test_time_in_force_enum_deserialization() {
     use kalshi::TimeInForce;
 
-    let fok: TimeInForce = serde_json::from_str("\"fill_or_kill\"")
-        .expect("Failed to deserialize fill_or_kill");
+    let fok: TimeInForce =
+        serde_json::from_str("\"fill_or_kill\"").expect("Failed to deserialize fill_or_kill");
     let gtc: TimeInForce = serde_json::from_str("\"good_till_canceled\"")
         .expect("Failed to deserialize good_till_canceled");
     let ioc: TimeInForce = serde_json::from_str("\"immediate_or_cancel\"")
@@ -47,8 +56,14 @@ fn test_time_in_force_enum_deserialization() {
 
     // Test roundtrip
     assert_eq!(serde_json::to_string(&fok).unwrap(), "\"fill_or_kill\"");
-    assert_eq!(serde_json::to_string(&gtc).unwrap(), "\"good_till_canceled\"");
-    assert_eq!(serde_json::to_string(&ioc).unwrap(), "\"immediate_or_cancel\"");
+    assert_eq!(
+        serde_json::to_string(&gtc).unwrap(),
+        "\"good_till_canceled\""
+    );
+    assert_eq!(
+        serde_json::to_string(&ioc).unwrap(),
+        "\"immediate_or_cancel\""
+    );
 }
 
 #[test]
@@ -61,18 +76,24 @@ fn test_self_trade_prevention_type_serialization() {
     let taker_json = serde_json::to_string(&taker).expect("Failed to serialize TakerAtCross");
     let maker_json = serde_json::to_string(&maker).expect("Failed to serialize Maker");
 
-    assert_eq!(taker_json, "\"taker_at_cross\"", "TakerAtCross should serialize to snake_case");
-    assert_eq!(maker_json, "\"maker\"", "Maker should serialize to lowercase");
+    assert_eq!(
+        taker_json, "\"taker_at_cross\"",
+        "TakerAtCross should serialize to snake_case"
+    );
+    assert_eq!(
+        maker_json, "\"maker\"",
+        "Maker should serialize to lowercase"
+    );
 }
 
 #[test]
 fn test_self_trade_prevention_type_deserialization() {
     use kalshi::SelfTradePreventionType;
 
-    let taker: SelfTradePreventionType = serde_json::from_str("\"taker_at_cross\"")
-        .expect("Failed to deserialize taker_at_cross");
-    let maker: SelfTradePreventionType = serde_json::from_str("\"maker\"")
-        .expect("Failed to deserialize maker");
+    let taker: SelfTradePreventionType =
+        serde_json::from_str("\"taker_at_cross\"").expect("Failed to deserialize taker_at_cross");
+    let maker: SelfTradePreventionType =
+        serde_json::from_str("\"maker\"").expect("Failed to deserialize maker");
 
     // Test roundtrip
     assert_eq!(serde_json::to_string(&taker).unwrap(), "\"taker_at_cross\"");
@@ -98,12 +119,30 @@ fn test_create_order_payload_serialization_all_new_fields() {
     let json_str = minimal_json.to_string();
 
     // Verify None fields are not included
-    assert!(!json_str.contains("time_in_force"), "time_in_force should be omitted when None");
-    assert!(!json_str.contains("post_only"), "post_only should be omitted when None");
-    assert!(!json_str.contains("reduce_only"), "reduce_only should be omitted when None");
-    assert!(!json_str.contains("self_trade_prevention_type"), "self_trade_prevention_type should be omitted when None");
-    assert!(!json_str.contains("order_group_id"), "order_group_id should be omitted when None");
-    assert!(!json_str.contains("cancel_order_on_pause"), "cancel_order_on_pause should be omitted when None");
+    assert!(
+        !json_str.contains("time_in_force"),
+        "time_in_force should be omitted when None"
+    );
+    assert!(
+        !json_str.contains("post_only"),
+        "post_only should be omitted when None"
+    );
+    assert!(
+        !json_str.contains("reduce_only"),
+        "reduce_only should be omitted when None"
+    );
+    assert!(
+        !json_str.contains("self_trade_prevention_type"),
+        "self_trade_prevention_type should be omitted when None"
+    );
+    assert!(
+        !json_str.contains("order_group_id"),
+        "order_group_id should be omitted when None"
+    );
+    assert!(
+        !json_str.contains("cancel_order_on_pause"),
+        "cancel_order_on_pause should be omitted when None"
+    );
 }
 
 #[test]
@@ -128,18 +167,36 @@ fn test_create_order_payload_serialization_with_new_fields() {
     let json_str = full_json.to_string();
 
     // Verify all new fields are included when Some
-    assert!(json_str.contains("time_in_force"), "time_in_force should be included when Some");
-    assert!(json_str.contains("post_only"), "post_only should be included when Some");
-    assert!(json_str.contains("reduce_only"), "reduce_only should be included when Some");
-    assert!(json_str.contains("self_trade_prevention_type"), "self_trade_prevention_type should be included when Some");
-    assert!(json_str.contains("order_group_id"), "order_group_id should be included when Some");
-    assert!(json_str.contains("cancel_order_on_pause"), "cancel_order_on_pause should be included when Some");
+    assert!(
+        json_str.contains("time_in_force"),
+        "time_in_force should be included when Some"
+    );
+    assert!(
+        json_str.contains("post_only"),
+        "post_only should be included when Some"
+    );
+    assert!(
+        json_str.contains("reduce_only"),
+        "reduce_only should be included when Some"
+    );
+    assert!(
+        json_str.contains("self_trade_prevention_type"),
+        "self_trade_prevention_type should be included when Some"
+    );
+    assert!(
+        json_str.contains("order_group_id"),
+        "order_group_id should be included when Some"
+    );
+    assert!(
+        json_str.contains("cancel_order_on_pause"),
+        "cancel_order_on_pause should be included when Some"
+    );
 }
 
 #[test]
 fn test_order_creation_field_new_params() {
     // Test OrderCreationField struct with new parameters
-    use kalshi::{OrderCreationField, TimeInForce, SelfTradePreventionType};
+    use kalshi::{OrderCreationField, SelfTradePreventionType, TimeInForce};
 
     let field = OrderCreationField {
         action: Action::Buy,
@@ -167,7 +224,10 @@ fn test_order_creation_field_new_params() {
     assert_eq!(field.time_in_force, Some(TimeInForce::GoodTillCanceled));
     assert_eq!(field.post_only, Some(true));
     assert_eq!(field.reduce_only, Some(false));
-    assert_eq!(field.self_trade_prevention_type, Some(SelfTradePreventionType::Maker));
+    assert_eq!(
+        field.self_trade_prevention_type,
+        Some(SelfTradePreventionType::Maker)
+    );
     assert_eq!(field.order_group_id, Some("group-123".to_string()));
     assert_eq!(field.cancel_order_on_pause, Some(false));
 }
@@ -187,27 +247,29 @@ async fn test_create_order_with_time_in_force() {
 
     // Attempt to create an order with new time_in_force parameter
     // This should fail gracefully if the parameter isn't implemented yet
-    let result = kalshi.create_order(
-        Action::Buy,
-        Some("test-tif-order".to_string()),
-        1,
-        Side::Yes,
-        "TEST-MARKET".to_string(),
-        OrderType::Limit,
-        None,                                      // buy_max_cost
-        None,                                      // expiration_ts
-        Some(1),                                   // yes_price (very low to avoid execution)
-        None,                                      // no_price
-        None,                                      // sell_position_floor
-        None,                                      // yes_price_dollars
-        None,                                      // no_price_dollars
-        Some(TimeInForce::ImmediateOrCancel),     // NEW: time_in_force
-        None,                                      // NEW: post_only
-        None,                                      // NEW: reduce_only
-        None,                                      // NEW: self_trade_prevention_type
-        None,                                      // NEW: order_group_id
-        None,                                      // NEW: cancel_order_on_pause
-    ).await;
+    let result = kalshi
+        .create_order(
+            Action::Buy,
+            Some("test-tif-order".to_string()),
+            1,
+            Side::Yes,
+            "TEST-MARKET".to_string(),
+            OrderType::Limit,
+            None,                                 // buy_max_cost
+            None,                                 // expiration_ts
+            Some(1),                              // yes_price (very low to avoid execution)
+            None,                                 // no_price
+            None,                                 // sell_position_floor
+            None,                                 // yes_price_dollars
+            None,                                 // no_price_dollars
+            Some(TimeInForce::ImmediateOrCancel), // NEW: time_in_force
+            None,                                 // NEW: post_only
+            None,                                 // NEW: reduce_only
+            None,                                 // NEW: self_trade_prevention_type
+            None,                                 // NEW: order_group_id
+            None,                                 // NEW: cancel_order_on_pause
+        )
+        .await;
 
     // For now, we just check that the function signature compiles
     // The actual result doesn't matter until implementation
@@ -260,8 +322,14 @@ fn test_amend_order_request_optional_fields_skipped() {
     let json_str = request_json.to_string();
 
     // count, no_price, yes_price_dollars, no_price_dollars should be omitted
-    assert!(!json_str.contains("\"count\""), "count should be omitted when None");
-    assert!(!json_str.contains("\"no_price\""), "no_price should be omitted when None");
+    assert!(
+        !json_str.contains("\"count\""),
+        "count should be omitted when None"
+    );
+    assert!(
+        !json_str.contains("\"no_price\""),
+        "no_price should be omitted when None"
+    );
 }
 
 #[test]
@@ -304,7 +372,10 @@ fn test_amend_order_response_deserialization() {
 
     let response: Result<AmendOrderResponse, _> = serde_json::from_str(json);
 
-    assert!(response.is_ok(), "AmendOrderResponse should deserialize successfully");
+    assert!(
+        response.is_ok(),
+        "AmendOrderResponse should deserialize successfully"
+    );
 
     let response = response.unwrap();
     assert_eq!(response.old_order.order_id, "old-123");
@@ -327,25 +398,30 @@ async fn test_amend_order_price_validation_multiple_prices() {
     };
 
     // This should fail validation: providing both yes_price and no_price
-    let result = kalshi.amend_order(
-        "test-order-id",
-        "TEST-MARKET",
-        Side::Yes,
-        Action::Buy,
-        "original-client-id",
-        "updated-client-id",
-        Some(55),  // yes_price
-        Some(45),  // no_price - CONFLICT!
-        None,      // yes_price_dollars
-        None,      // no_price_dollars
-        None,      // count
-    ).await;
+    let result = kalshi
+        .amend_order(
+            "test-order-id",
+            "TEST-MARKET",
+            Side::Yes,
+            Action::Buy,
+            "original-client-id",
+            "updated-client-id",
+            Some(55), // yes_price
+            Some(45), // no_price - CONFLICT!
+            None,     // yes_price_dollars
+            None,     // no_price_dollars
+            None,     // count
+        )
+        .await;
 
     // Should return UserInputError
     match result {
         Err(KalshiError::UserInputError(msg)) => {
-            assert!(msg.contains("one of") || msg.contains("Exactly one"),
-                    "Error should mention only one price field allowed: {}", msg);
+            assert!(
+                msg.contains("one of") || msg.contains("Exactly one"),
+                "Error should mention only one price field allowed: {}",
+                msg
+            );
         }
         _ => panic!("Expected UserInputError for multiple price fields"),
     }
@@ -363,24 +439,31 @@ async fn test_amend_order_price_validation_zero_prices() {
     };
 
     // This should be valid: no price fields, only count
-    let result = kalshi.amend_order(
-        "test-order-id",
-        "TEST-MARKET",
-        Side::Yes,
-        Action::Buy,
-        "original-client-id",
-        "updated-client-id",
-        None,      // yes_price
-        None,      // no_price
-        None,      // yes_price_dollars
-        None,      // no_price_dollars
-        Some(15),  // count
-    ).await;
+    let result = kalshi
+        .amend_order(
+            "test-order-id",
+            "TEST-MARKET",
+            Side::Yes,
+            Action::Buy,
+            "original-client-id",
+            "updated-client-id",
+            None,     // yes_price
+            None,     // no_price
+            None,     // yes_price_dollars
+            None,     // no_price_dollars
+            Some(15), // count
+        )
+        .await;
 
     // Should either succeed or fail for reasons other than validation
     match result {
-        Err(KalshiError::UserInputError(msg)) if msg.contains("one of") || msg.contains("Exactly one") => {
-            panic!("Should allow zero price fields when count is provided: {}", msg);
+        Err(KalshiError::UserInputError(msg))
+            if msg.contains("one of") || msg.contains("Exactly one") =>
+        {
+            panic!(
+                "Should allow zero price fields when count is provided: {}",
+                msg
+            );
         }
         _ => {
             // OK - either succeeded or failed for other reasons (like order not found)
@@ -401,23 +484,27 @@ async fn test_amend_order_price_validation_one_price() {
     };
 
     // This should be valid: exactly one price field
-    let result = kalshi.amend_order(
-        "test-order-id",
-        "TEST-MARKET",
-        Side::Yes,
-        Action::Buy,
-        "original-client-id",
-        "updated-client-id",
-        Some(55),  // yes_price - only one price field
-        None,      // no_price
-        None,      // yes_price_dollars
-        None,      // no_price_dollars
-        None,      // count
-    ).await;
+    let result = kalshi
+        .amend_order(
+            "test-order-id",
+            "TEST-MARKET",
+            Side::Yes,
+            Action::Buy,
+            "original-client-id",
+            "updated-client-id",
+            Some(55), // yes_price - only one price field
+            None,     // no_price
+            None,     // yes_price_dollars
+            None,     // no_price_dollars
+            None,     // count
+        )
+        .await;
 
     // Should either succeed or fail for reasons other than validation
     match result {
-        Err(KalshiError::UserInputError(msg)) if msg.contains("one of") || msg.contains("Exactly one") => {
+        Err(KalshiError::UserInputError(msg))
+            if msg.contains("one of") || msg.contains("Exactly one") =>
+        {
             panic!("Should allow exactly one price field: {}", msg);
         }
         _ => {
@@ -442,18 +529,23 @@ async fn test_get_settlements_with_ticker_filter() {
     };
 
     // Test with new ticker parameter
-    let result = kalshi.get_settlements(
-        None,                           // limit
-        None,                           // cursor
-        Some("TEST-MARKET".to_string()), // NEW: ticker
-        None,                           // NEW: event_ticker
-        None,                           // NEW: min_ts
-        None,                           // NEW: max_ts
-    ).await;
+    let result = kalshi
+        .get_settlements(
+            None,                            // limit
+            None,                            // cursor
+            Some("TEST-MARKET".to_string()), // NEW: ticker
+            None,                            // NEW: event_ticker
+            None,                            // NEW: min_ts
+            None,                            // NEW: max_ts
+        )
+        .await;
 
     match result {
         Ok((_cursor, settlements)) => {
-            println!("Got settlements with ticker filter: {} results", settlements.len());
+            println!(
+                "Got settlements with ticker filter: {} results",
+                settlements.len()
+            );
             // Verify ticker parameter was accepted
             assert!(true, "ticker parameter accepted");
         }
@@ -475,18 +567,23 @@ async fn test_get_settlements_with_event_ticker_filter() {
     };
 
     // Test with new event_ticker parameter
-    let result = kalshi.get_settlements(
-        None,                              // limit
-        None,                              // cursor
-        None,                              // NEW: ticker
-        Some("EVENT-2024".to_string()),    // NEW: event_ticker
-        None,                              // NEW: min_ts
-        None,                              // NEW: max_ts
-    ).await;
+    let result = kalshi
+        .get_settlements(
+            None,                           // limit
+            None,                           // cursor
+            None,                           // NEW: ticker
+            Some("EVENT-2024".to_string()), // NEW: event_ticker
+            None,                           // NEW: min_ts
+            None,                           // NEW: max_ts
+        )
+        .await;
 
     match result {
         Ok((_cursor, settlements)) => {
-            println!("Got settlements with event_ticker filter: {} results", settlements.len());
+            println!(
+                "Got settlements with event_ticker filter: {} results",
+                settlements.len()
+            );
             assert!(true, "event_ticker parameter accepted");
         }
         Err(e) => {
@@ -509,18 +606,23 @@ async fn test_get_settlements_with_timestamp_filters() {
     let min_ts = 1704067200; // 2024-01-01 00:00:00 UTC
     let max_ts = 1735689600; // 2025-01-01 00:00:00 UTC
 
-    let result = kalshi.get_settlements(
-        None,          // limit
-        None,          // cursor
-        None,          // NEW: ticker
-        None,          // NEW: event_ticker
-        Some(min_ts),  // NEW: min_ts
-        Some(max_ts),  // NEW: max_ts
-    ).await;
+    let result = kalshi
+        .get_settlements(
+            None,         // limit
+            None,         // cursor
+            None,         // NEW: ticker
+            None,         // NEW: event_ticker
+            Some(min_ts), // NEW: min_ts
+            Some(max_ts), // NEW: max_ts
+        )
+        .await;
 
     match result {
         Ok((_cursor, settlements)) => {
-            println!("Got settlements with timestamp filters: {} results", settlements.len());
+            println!(
+                "Got settlements with timestamp filters: {} results",
+                settlements.len()
+            );
             assert!(true, "timestamp parameters accepted");
         }
         Err(e) => {
@@ -540,18 +642,23 @@ async fn test_get_settlements_with_all_new_filters() {
     };
 
     // Test with all new parameters combined
-    let result = kalshi.get_settlements(
-        Some(50),                           // limit
-        None,                               // cursor
-        Some("TEST-MARKET".to_string()),    // NEW: ticker
-        Some("EVENT-2024".to_string()),     // NEW: event_ticker
-        Some(1704067200),                   // NEW: min_ts
-        Some(1735689600),                   // NEW: max_ts
-    ).await;
+    let result = kalshi
+        .get_settlements(
+            Some(50),                        // limit
+            None,                            // cursor
+            Some("TEST-MARKET".to_string()), // NEW: ticker
+            Some("EVENT-2024".to_string()),  // NEW: event_ticker
+            Some(1704067200),                // NEW: min_ts
+            Some(1735689600),                // NEW: max_ts
+        )
+        .await;
 
     match result {
         Ok((_cursor, settlements)) => {
-            println!("Got settlements with all filters: {} results", settlements.len());
+            println!(
+                "Got settlements with all filters: {} results",
+                settlements.len()
+            );
             assert!(true, "All new parameters accepted");
         }
         Err(e) => {
@@ -575,19 +682,24 @@ async fn test_get_positions_with_count_filter_position() {
     };
 
     // Test with count_filter="position"
-    let result = kalshi.get_positions(
-        None,                           // limit
-        None,                           // cursor
-        None,                           // settlement_status
-        None,                           // ticker
-        None,                           // event_ticker
-        Some("position".to_string()),   // NEW: count_filter
-    ).await;
+    let result = kalshi
+        .get_positions(
+            None,                         // limit
+            None,                         // cursor
+            None,                         // settlement_status
+            None,                         // ticker
+            None,                         // event_ticker
+            Some("position".to_string()), // NEW: count_filter
+        )
+        .await;
 
     match result {
         Ok((_cursor, event_positions, market_positions)) => {
-            println!("Got positions with count_filter='position': {} events, {} markets",
-                     event_positions.len(), market_positions.len());
+            println!(
+                "Got positions with count_filter='position': {} events, {} markets",
+                event_positions.len(),
+                market_positions.len()
+            );
             assert!(true, "count_filter parameter accepted");
         }
         Err(e) => {
@@ -607,19 +719,24 @@ async fn test_get_positions_with_count_filter_total_traded() {
     };
 
     // Test with count_filter="total_traded"
-    let result = kalshi.get_positions(
-        None,                               // limit
-        None,                               // cursor
-        None,                               // settlement_status
-        None,                               // ticker
-        None,                               // event_ticker
-        Some("total_traded".to_string()),   // NEW: count_filter
-    ).await;
+    let result = kalshi
+        .get_positions(
+            None,                             // limit
+            None,                             // cursor
+            None,                             // settlement_status
+            None,                             // ticker
+            None,                             // event_ticker
+            Some("total_traded".to_string()), // NEW: count_filter
+        )
+        .await;
 
     match result {
         Ok((_cursor, event_positions, market_positions)) => {
-            println!("Got positions with count_filter='total_traded': {} events, {} markets",
-                     event_positions.len(), market_positions.len());
+            println!(
+                "Got positions with count_filter='total_traded': {} events, {} markets",
+                event_positions.len(),
+                market_positions.len()
+            );
             assert!(true, "count_filter='total_traded' accepted");
         }
         Err(e) => {
@@ -639,19 +756,24 @@ async fn test_get_positions_with_count_filter_combined() {
     };
 
     // Test with combined count_filter values (comma-separated)
-    let result = kalshi.get_positions(
-        None,                                       // limit
-        None,                                       // cursor
-        None,                                       // settlement_status
-        None,                                       // ticker
-        None,                                       // event_ticker
-        Some("position,total_traded".to_string()), // NEW: count_filter (combined)
-    ).await;
+    let result = kalshi
+        .get_positions(
+            None,                                      // limit
+            None,                                      // cursor
+            None,                                      // settlement_status
+            None,                                      // ticker
+            None,                                      // event_ticker
+            Some("position,total_traded".to_string()), // NEW: count_filter (combined)
+        )
+        .await;
 
     match result {
         Ok((_cursor, event_positions, market_positions)) => {
-            println!("Got positions with combined count_filter: {} events, {} markets",
-                     event_positions.len(), market_positions.len());
+            println!(
+                "Got positions with combined count_filter: {} events, {} markets",
+                event_positions.len(),
+                market_positions.len()
+            );
             assert!(true, "Combined count_filter accepted");
         }
         Err(e) => {
@@ -671,24 +793,32 @@ async fn test_get_positions_without_count_filter() {
     };
 
     // Test backward compatibility: should work without count_filter
-    let result = kalshi.get_positions(
-        None,  // limit
-        None,  // cursor
-        None,  // settlement_status
-        None,  // ticker
-        None,  // event_ticker
-        None,  // NEW: count_filter (omitted for backward compatibility)
-    ).await;
+    let result = kalshi
+        .get_positions(
+            None, // limit
+            None, // cursor
+            None, // settlement_status
+            None, // ticker
+            None, // event_ticker
+            None, // NEW: count_filter (omitted for backward compatibility)
+        )
+        .await;
 
     match result {
         Ok((_cursor, event_positions, market_positions)) => {
-            println!("Got positions without count_filter: {} events, {} markets",
-                     event_positions.len(), market_positions.len());
+            println!(
+                "Got positions without count_filter: {} events, {} markets",
+                event_positions.len(),
+                market_positions.len()
+            );
             assert!(true, "Backward compatibility maintained");
         }
         Err(e) => {
             // Should not fail just because count_filter is None
-            panic!("Should maintain backward compatibility without count_filter: {:?}", e);
+            panic!(
+                "Should maintain backward compatibility without count_filter: {:?}",
+                e
+            );
         }
     }
 }
@@ -712,30 +842,32 @@ async fn test_phase1_integration_create_and_amend_order() {
         }
     };
 
-    use kalshi::{TimeInForce, SelfTradePreventionType};
+    use kalshi::{SelfTradePreventionType, TimeInForce};
 
     // Step 1: Create order with new parameters
-    let create_result = kalshi.create_order(
-        Action::Buy,
-        Some("integration-test-order".to_string()),
-        1,
-        Side::Yes,
-        "TEST-MARKET".to_string(),
-        OrderType::Limit,
-        None,                                       // buy_max_cost
-        None,                                       // expiration_ts
-        Some(1),                                    // yes_price (very low)
-        None,                                       // no_price
-        None,                                       // sell_position_floor
-        None,                                       // yes_price_dollars
-        None,                                       // no_price_dollars
-        Some(TimeInForce::GoodTillCanceled),        // NEW: time_in_force
-        Some(true),                                 // NEW: post_only
-        None,                                       // NEW: reduce_only
-        Some(SelfTradePreventionType::Maker),       // NEW: self_trade_prevention_type
-        Some("test-group-1".to_string()),           // NEW: order_group_id
-        Some(false),                                // NEW: cancel_order_on_pause
-    ).await;
+    let create_result = kalshi
+        .create_order(
+            Action::Buy,
+            Some("integration-test-order".to_string()),
+            1,
+            Side::Yes,
+            "TEST-MARKET".to_string(),
+            OrderType::Limit,
+            None,                                 // buy_max_cost
+            None,                                 // expiration_ts
+            Some(1),                              // yes_price (very low)
+            None,                                 // no_price
+            None,                                 // sell_position_floor
+            None,                                 // yes_price_dollars
+            None,                                 // no_price_dollars
+            Some(TimeInForce::GoodTillCanceled),  // NEW: time_in_force
+            Some(true),                           // NEW: post_only
+            None,                                 // NEW: reduce_only
+            Some(SelfTradePreventionType::Maker), // NEW: self_trade_prevention_type
+            Some("test-group-1".to_string()),     // NEW: order_group_id
+            Some(false),                          // NEW: cancel_order_on_pause
+        )
+        .await;
 
     // For TDD, we expect this to fail until implementation
     match create_result {
@@ -743,25 +875,30 @@ async fn test_phase1_integration_create_and_amend_order() {
             println!("Created order: {:?}", order.order_id);
 
             // Step 2: Amend the order
-            let amend_result = kalshi.amend_order(
-                &order.order_id,
-                "TEST-MARKET",
-                Side::Yes,
-                Action::Buy,
-                "integration-test-order",
-                "integration-test-order-amended",
-                Some(2),  // New yes_price
-                None,     // no_price
-                None,     // yes_price_dollars
-                None,     // no_price_dollars
-                Some(2),  // New count
-            ).await;
+            let amend_result = kalshi
+                .amend_order(
+                    &order.order_id,
+                    "TEST-MARKET",
+                    Side::Yes,
+                    Action::Buy,
+                    "integration-test-order",
+                    "integration-test-order-amended",
+                    Some(2), // New yes_price
+                    None,    // no_price
+                    None,    // yes_price_dollars
+                    None,    // no_price_dollars
+                    Some(2), // New count
+                )
+                .await;
 
             match amend_result {
                 Ok(amend_response) => {
                     println!("Amended order successfully");
                     assert_eq!(amend_response.old_order.order_id, order.order_id);
-                    assert_ne!(amend_response.order.yes_price, amend_response.old_order.yes_price);
+                    assert_ne!(
+                        amend_response.order.yes_price,
+                        amend_response.old_order.yes_price
+                    );
                 }
                 Err(e) => println!("Amend failed (expected for TDD): {:?}", e),
             }

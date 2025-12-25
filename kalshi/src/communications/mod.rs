@@ -434,4 +434,3 @@ pub struct QuoteConfirmed {
     /// The fill ID if trade was completed.
     pub fill_id: Option<String>,
 }
-

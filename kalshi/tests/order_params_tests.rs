@@ -2,7 +2,7 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use kalshi::{Action, OrderType, Side, TimeInForce, SelfTradePreventionType, AmendOrderResponse};
+use kalshi::{Action, AmendOrderResponse, OrderType, SelfTradePreventionType, Side, TimeInForce};
 
 #[test]
 fn test_time_in_force_enum_serialization() {

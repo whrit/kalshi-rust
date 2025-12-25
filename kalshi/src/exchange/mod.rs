@@ -94,7 +94,8 @@ impl Kalshi {
         add_param!(params, "cursor", cursor);
 
         let final_url = reqwest::Url::parse_with_params(&url, &params)?;
-        let res: ExchangeAnnouncementsResponse = self.client.get(final_url).send().await?.json().await?;
+        let res: ExchangeAnnouncementsResponse =
+            self.client.get(final_url).send().await?.json().await?;
         Ok((res.cursor, res.announcements))
     }
 
@@ -144,7 +145,7 @@ impl Kalshi {
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
     /// // This will exit the program if exchange doesn't become active after retries
     /// kalshi_instance.check_exchange_active_with_backoff().await.unwrap();
-    /// 
+    ///
     /// // Custom configuration
     /// kalshi_instance.check_exchange_active_with_backoff(3, 60.0, 600.0).await.unwrap();
     /// ```
@@ -153,11 +154,11 @@ impl Kalshi {
         &self,
         max_attempts: u32,
         base_delay_secs: f64,
-        max_delay_secs: f64
+        max_delay_secs: f64,
     ) -> Result<(), KalshiError> {
         use std::process;
         use tokio::time::{sleep, Duration};
-        
+
         for attempt in 1..=max_attempts {
             match self.get_exchange_status().await {
                 Ok(status) => {
@@ -165,7 +166,7 @@ impl Kalshi {
                         println!("Exchange is active (attempt {}/{}", attempt, max_attempts);
                         return Ok(());
                     }
-                    
+
                     if attempt < max_attempts {
                         let delay_secs = (base_delay_secs * (2.0_f64.powi((attempt - 1) as i32)))
                             .min(max_delay_secs);
@@ -188,12 +189,15 @@ impl Kalshi {
                         );
                         sleep(Duration::from_secs_f64(delay_secs)).await;
                     } else {
-                        println!("Failed to check exchange status after {} attempts: {}", max_attempts, e);
+                        println!(
+                            "Failed to check exchange status after {} attempts: {}",
+                            max_attempts, e
+                        );
                     }
                 }
             }
         }
-        
+
         println!("Exiting as exchange is not active after all retry attempts");
         process::exit(1);
     }
@@ -218,7 +222,8 @@ impl Kalshi {
     /// ```
     ///
     pub async fn check_exchange_active(&self) -> Result<(), KalshiError> {
-        self.check_exchange_active_with_backoff(5, 30.0, 300.0).await
+        self.check_exchange_active_with_backoff(5, 30.0, 300.0)
+            .await
     }
 
     /// Retrieves series fee changes from the exchange.
@@ -346,19 +351,26 @@ pub struct StandardHours {
     /// The end time for the trading period.
     pub end_time: String,
     /// Trading schedule for Monday.
-    #[serde(default)] pub monday: Vec<DaySchedule>,
+    #[serde(default)]
+    pub monday: Vec<DaySchedule>,
     /// Trading schedule for Tuesday.
-    #[serde(default)] pub tuesday: Vec<DaySchedule>,
+    #[serde(default)]
+    pub tuesday: Vec<DaySchedule>,
     /// Trading schedule for Wednesday.
-    #[serde(default)] pub wednesday: Vec<DaySchedule>,
+    #[serde(default)]
+    pub wednesday: Vec<DaySchedule>,
     /// Trading schedule for Thursday.
-    #[serde(default)] pub thursday: Vec<DaySchedule>,
+    #[serde(default)]
+    pub thursday: Vec<DaySchedule>,
     /// Trading schedule for Friday.
-    #[serde(default)] pub friday: Vec<DaySchedule>,
+    #[serde(default)]
+    pub friday: Vec<DaySchedule>,
     /// Trading schedule for Saturday.
-    #[serde(default)] pub saturday: Vec<DaySchedule>,
+    #[serde(default)]
+    pub saturday: Vec<DaySchedule>,
     /// Trading schedule for Sunday.
-    #[serde(default)] pub sunday: Vec<DaySchedule>,
+    #[serde(default)]
+    pub sunday: Vec<DaySchedule>,
 }
 
 // -------- response wrappers --------

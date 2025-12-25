@@ -62,7 +62,7 @@ impl Kalshi {
     ) -> Result<Vec<LiveData>, KalshiError> {
         let path = "/live_data/batch";
         let mut params = vec![];
-        
+
         // Add each milestone_id as a separate query parameter
         for id in milestone_ids {
             params.push(("milestone_ids".to_string(), id));
@@ -97,4 +97,3 @@ pub struct LiveData {
     /// The timestamp when this data was last updated.
     pub last_updated_ts: Option<String>,
 }
-

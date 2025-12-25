@@ -41,7 +41,7 @@ fn retreive_credentials(setting: APIType) -> Result<(String, String), std::io::E
 async fn main() {
     dotenv().ok();
 
-    let (username, password) = retreive_credentials(APIType::Demo).unwrap() ;
+    let (username, password) = retreive_credentials(APIType::Demo).unwrap();
 
     let mut kalshi_instance = Kalshi::new(kalshi::TradingEnvironment::DemoMode);
 
@@ -49,12 +49,17 @@ async fn main() {
 
     let new_york_ticker = "HIGHNY-23NOV13-T51".to_string();
 
-    let nytemp_market_data = kalshi_instance.get_single_market(&new_york_ticker).await.unwrap();
-    
-    let nytemp_market_orderbook = kalshi_instance.get_market_orderbook(&new_york_ticker, Some(10)).await.unwrap();
+    let nytemp_market_data = kalshi_instance
+        .get_single_market(&new_york_ticker)
+        .await
+        .unwrap();
 
+    let nytemp_market_orderbook = kalshi_instance
+        .get_market_orderbook(&new_york_ticker, Some(10))
+        .await
+        .unwrap();
 
-      let bought_order = kalshi_instance
+    let bought_order = kalshi_instance
         .create_order(
             kalshi::Action::Buy,
             None,
@@ -72,9 +77,7 @@ async fn main() {
         .unwrap();
 
     let ny_order_id = bought_order.order_id.clone();
-    
+
     let cancelled_order = kalshi_instance.cancel_order(&ny_order_id).await.unwrap();
     println!("{:?}", cancelled_order);
-
-    
 }

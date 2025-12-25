@@ -1,6 +1,6 @@
 use super::Kalshi;
 use crate::kalshi_error::*;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
 impl<'a> Kalshi {
@@ -39,10 +39,14 @@ impl<'a> Kalshi {
     ///
     pub async fn get_markets(
         &self,
-        limit: Option<i64>, cursor: Option<String>,
-        event_ticker: Option<String>, series_ticker: Option<String>,
-        status: Option<String>, tickers: Option<String>,
-        min_close_ts: Option<i64>, max_close_ts: Option<i64>,
+        limit: Option<i64>,
+        cursor: Option<String>,
+        event_ticker: Option<String>,
+        series_ticker: Option<String>,
+        status: Option<String>,
+        tickers: Option<String>,
+        min_close_ts: Option<i64>,
+        max_close_ts: Option<i64>,
     ) -> Result<(Option<String>, Vec<Market>), KalshiError> {
         let url = format!("{}/markets", self.base_url);
         let mut p = vec![];
@@ -55,9 +59,13 @@ impl<'a> Kalshi {
         add_param!(p, "min_close_ts", min_close_ts);
         add_param!(p, "max_close_ts", max_close_ts);
 
-        let res: MarketListResponse = self.client
+        let res: MarketListResponse = self
+            .client
             .get(reqwest::Url::parse_with_params(&url, &p)?)
-            .send().await?.json().await?;
+            .send()
+            .await?
+            .json()
+            .await?;
         Ok((res.cursor, res.markets))
     }
 
@@ -112,38 +120,59 @@ impl<'a> Kalshi {
     /// let orderbook = kalshi_instance.get_orderbook(ticker, Some(10)).await.unwrap();
     /// ```
     ///
-    pub async fn get_orderbook(&self, ticker: &str, depth: Option<i32>) -> Result<Orderbook, KalshiError> {
+    pub async fn get_orderbook(
+        &self,
+        ticker: &str,
+        depth: Option<i32>,
+    ) -> Result<Orderbook, KalshiError> {
         let mut url = format!("{}/markets/{}/orderbook", self.base_url, ticker);
-        
+
         if let Some(d) = depth {
             url.push_str(&format!("?depth={}", d));
         }
-        
+
         let response = self.client.get(&url).send().await?;
         let response_text = response.text().await?;
-        
+
         // Try to parse as JSON first to see what we're getting
-        let json_value: serde_json::Value = serde_json::from_str(&response_text)
-            .map_err(|e| {
-                eprintln!("ERROR: Failed to parse response as JSON for ticker {}: {}", ticker, e);
-                eprintln!("ERROR: Raw response: {}", response_text);
-                KalshiError::UserInputError(format!("Failed to parse JSON: {}", e))
-            })?;
-        
+        let json_value: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| {
+            eprintln!(
+                "ERROR: Failed to parse response as JSON for ticker {}: {}",
+                ticker, e
+            );
+            eprintln!("ERROR: Raw response: {}", response_text);
+            KalshiError::UserInputError(format!("Failed to parse JSON: {}", e))
+        })?;
+
         // Check if the response has an "orderbook" field
         if !json_value.is_object() || !json_value.as_object().unwrap().contains_key("orderbook") {
-            eprintln!("ERROR: Response does not contain 'orderbook' field for ticker: {}", ticker);
-            eprintln!("ERROR: Available keys: {:?}", json_value.as_object().map(|obj| obj.keys().collect::<Vec<_>>()));
-            eprintln!("ERROR: Full response: {}", serde_json::to_string_pretty(&json_value).unwrap());
-            return Err(KalshiError::UserInputError("missing field `orderbook`".to_string()));
+            eprintln!(
+                "ERROR: Response does not contain 'orderbook' field for ticker: {}",
+                ticker
+            );
+            eprintln!(
+                "ERROR: Available keys: {:?}",
+                json_value
+                    .as_object()
+                    .map(|obj| obj.keys().collect::<Vec<_>>())
+            );
+            eprintln!(
+                "ERROR: Full response: {}",
+                serde_json::to_string_pretty(&json_value).unwrap()
+            );
+            return Err(KalshiError::UserInputError(
+                "missing field `orderbook`".to_string(),
+            ));
         }
-        
-        let res: OrderbookResponse = serde_json::from_value(json_value)
-            .map_err(|e| {
-                eprintln!("ERROR: Failed to deserialize OrderbookResponse for ticker {}: {}", ticker, e);
-                KalshiError::UserInputError(format!("Failed to deserialize: {}", e))
-            })?;
-        
+
+        let res: OrderbookResponse = serde_json::from_value(json_value).map_err(|e| {
+            eprintln!(
+                "ERROR: Failed to deserialize OrderbookResponse for ticker {}: {}",
+                ticker, e
+            );
+            KalshiError::UserInputError(format!("Failed to deserialize: {}", e))
+        })?;
+
         Ok(res.orderbook)
     }
 
@@ -207,16 +236,22 @@ impl<'a> Kalshi {
         end_ts: Option<i64>,
         period_interval: Option<i32>,
     ) -> Result<Vec<Candle>, KalshiError> {
-        let url = format!("{}/series/{}/markets/{}/candlesticks",
-                          self.base_url, series_ticker, ticker);
+        let url = format!(
+            "{}/series/{}/markets/{}/candlesticks",
+            self.base_url, series_ticker, ticker
+        );
         let mut p = vec![];
         add_param!(p, "start_ts", start_ts);
         add_param!(p, "end_ts", end_ts);
         add_param!(p, "period_interval", period_interval);
 
-        let res: CandlestickListResponse = self.client
+        let res: CandlestickListResponse = self
+            .client
             .get(reqwest::Url::parse_with_params(&url, &p)?)
-            .send().await?.json().await?;
+            .send()
+            .await?
+            .json()
+            .await?;
         Ok(res.candlesticks)
     }
 
@@ -251,8 +286,11 @@ impl<'a> Kalshi {
     ///
     pub async fn get_trades(
         &self,
-        limit: Option<i64>, cursor: Option<String>,
-        ticker: Option<String>, min_ts: Option<i64>, max_ts: Option<i64>,
+        limit: Option<i64>,
+        cursor: Option<String>,
+        ticker: Option<String>,
+        min_ts: Option<i64>,
+        max_ts: Option<i64>,
     ) -> Result<(Option<String>, Vec<Trade>), KalshiError> {
         let url = format!("{}/markets/trades", self.base_url);
         let mut p = vec![];
@@ -262,9 +300,13 @@ impl<'a> Kalshi {
         add_param!(p, "min_ts", min_ts);
         add_param!(p, "max_ts", max_ts);
 
-        let res: TradeListResponse = self.client
+        let res: TradeListResponse = self
+            .client
             .get(reqwest::Url::parse_with_params(&url, &p)?)
-            .send().await?.json().await?;
+            .send()
+            .await?
+            .json()
+            .await?;
         Ok((res.cursor, res.trades))
     }
 
@@ -304,24 +346,24 @@ impl<'a> Kalshi {
     ) -> Result<(Option<String>, Vec<Series>), KalshiError> {
         // --- build query string ------------------------------------------------
         let mut p = Vec::new();
-        add_param!(p, "limit",    limit);
-        add_param!(p, "cursor",   cursor);
+        add_param!(p, "limit", limit);
+        add_param!(p, "cursor", cursor);
         add_param!(p, "category", category);
-        add_param!(p, "tags",     tags);
-    
+        add_param!(p, "tags", tags);
+
         let path = if p.is_empty() {
             "/series".to_string()
         } else {
             format!("/series?{}", serde_urlencoded::to_string(&p)?)
         };
-    
+
         // --- signed GET --------------------------------------------------------
         #[derive(Debug, serde::Deserialize)]
         struct SeriesListResponse {
             cursor: Option<String>,
-            series: Option<Vec<Series>>,   // ← tolerate `null`
+            series: Option<Vec<Series>>, // ← tolerate `null`
         }
-    
+
         let res: SeriesListResponse = self.signed_get(&path).await?;
         Ok((res.cursor, res.series.unwrap_or_default()))
     }
@@ -372,42 +414,47 @@ where
     D: Deserializer<'de>,
 {
     use serde::de::Error;
-    
+
     // First, deserialize as a Vec of generic JSON values
     let opt = Option::<Vec<serde_json::Value>>::deserialize(d)?;
-    
+
     // If null or missing, return empty vec
     let Some(arr) = opt else {
         return Ok(Vec::new());
     };
-    
+
     // Convert each [price_string, count] to (f32, i32)
     let mut result = Vec::new();
     for item in arr {
-        let level = item.as_array()
+        let level = item
+            .as_array()
             .ok_or_else(|| Error::custom("Expected array for price level"))?;
-        
+
         if level.len() != 2 {
             return Err(Error::custom("Expected array of length 2 for price level"));
         }
-        
+
         // Parse price (can be string or number)
         let price: f32 = match &level[0] {
-            serde_json::Value::String(s) => s.parse()
+            serde_json::Value::String(s) => s
+                .parse()
                 .map_err(|_| Error::custom(format!("Failed to parse price string: {}", s)))?,
-            serde_json::Value::Number(n) => n.as_f64()
-                .ok_or_else(|| Error::custom("Failed to convert price number to f64"))? as f32,
+            serde_json::Value::Number(n) => n
+                .as_f64()
+                .ok_or_else(|| Error::custom("Failed to convert price number to f64"))?
+                as f32,
             _ => return Err(Error::custom("Price must be string or number")),
         };
-        
+
         // Parse count (should be a number)
-        let count: i32 = level[1].as_i64()
+        let count: i32 = level[1]
+            .as_i64()
             .ok_or_else(|| Error::custom("Count must be a number"))?
             as i32;
-        
+
         result.push((price, count));
     }
-    
+
     Ok(result)
 }
 
@@ -493,15 +540,9 @@ pub struct Series {
     pub title: Option<String>,
     #[serde(default)]
     pub category: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "null_to_empty_vec"
-    )]
+    #[serde(default, deserialize_with = "null_to_empty_vec")]
     pub tags: Vec<String>,
-    #[serde(
-        default,
-        deserialize_with = "null_to_empty_vec"
-    )]
+    #[serde(default, deserialize_with = "null_to_empty_vec")]
     pub settlement_sources: Vec<SettlementSource>,
     #[serde(default)]
     pub contract_url: Option<String>,
@@ -519,15 +560,9 @@ pub struct MultivariateEventCollection {
     pub title: String,
     pub description: String,
     pub category: String,
-    #[serde(
-        default,
-        deserialize_with = "null_to_empty_vec"
-    )]
+    #[serde(default, deserialize_with = "null_to_empty_vec")]
     pub tags: Vec<String>,
-    #[serde(
-        default,
-        deserialize_with = "null_to_empty_vec"
-    )]
+    #[serde(default, deserialize_with = "null_to_empty_vec")]
     pub markets: Vec<Market>,
     pub created_time: String,
     pub updated_time: String,

@@ -1,7 +1,7 @@
 //! milestone.rs – wrappers for Kalshi Trade API → milestone
+use crate::{kalshi_error::*, Kalshi};
 use serde::Deserialize;
 use serde_json::Value;
-use crate::{Kalshi, kalshi_error::*};
 
 /// We don’t yet have a public schema; store raw JSON.
 pub type Milestone = Value;
@@ -25,10 +25,13 @@ impl<'a> Kalshi {
         cursor: Option<String>,
     ) -> Result<(Option<String>, Vec<Milestone>), KalshiError> {
         let mut p = Vec::new();
-        add_param!(p, "limit",  limit);
+        add_param!(p, "limit", limit);
         add_param!(p, "cursor", cursor);
-        let path = if p.is_empty() { "/milestones".to_string() }
-                   else { format!("/milestones?{}", serde_urlencoded::to_string(&p)?) };
+        let path = if p.is_empty() {
+            "/milestones".to_string()
+        } else {
+            format!("/milestones?{}", serde_urlencoded::to_string(&p)?)
+        };
         let res: MilestoneListResponse = self.signed_get(&path).await?;
         Ok((res.cursor, res.milestones))
     }

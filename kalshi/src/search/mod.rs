@@ -24,7 +24,9 @@ impl Kalshi {
     /// }
     /// ```
     ///
-    pub async fn get_tags_by_categories(&self) -> Result<HashMap<String, Vec<String>>, KalshiError> {
+    pub async fn get_tags_by_categories(
+        &self,
+    ) -> Result<HashMap<String, Vec<String>>, KalshiError> {
         let path = "/search/tags_by_categories";
         let res: TagsResponse = self.signed_get(path).await?;
         Ok(res.tags_by_category)
@@ -75,4 +77,3 @@ pub struct SportsFilters {
     #[serde(flatten)]
     pub additional_filters: HashMap<String, serde_json::Value>,
 }
-

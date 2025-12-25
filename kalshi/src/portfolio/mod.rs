@@ -26,7 +26,9 @@ impl<'a> Kalshi {
     /// ```
     ///
     pub async fn get_balance(&self) -> Result<i64, KalshiError> {
-        let result: BalanceResponse = self.signed_get(&format!("{}/balance", PORTFOLIO_PATH)).await?;
+        let result: BalanceResponse = self
+            .signed_get(&format!("{}/balance", PORTFOLIO_PATH))
+            .await?;
         Ok(result.balance)
     }
 
@@ -458,7 +460,7 @@ impl<'a> Kalshi {
     /// ).await.unwrap();
     /// ```
     ///
-    
+
     // TODO: rewrite using generics
     pub async fn create_order(
         &self,
@@ -517,7 +519,7 @@ impl<'a> Kalshi {
                         "Can only provide yes price or no price, not both".to_string(),
                     ));
                 }
-            },
+            }
             _ => {}
         }
 
@@ -616,7 +618,8 @@ impl<'a> Kalshi {
         let path = format!("{}/orders/batched", PORTFOLIO_PATH);
         let body = BatchCancelOrderPayload { ids };
 
-        let response: BatchCancelOrdersResponse = self.signed_delete_with_body(&path, &body).await?;
+        let response: BatchCancelOrdersResponse =
+            self.signed_delete_with_body(&path, &body).await?;
 
         let mut out = Vec::with_capacity(response.orders.len());
         for item in response.orders {
@@ -702,7 +705,10 @@ impl<'a> Kalshi {
     /// let order_group = kalshi_instance.create_order_group(100).await.unwrap();
     /// ```
     ///
-    pub async fn create_order_group(&self, contracts_limit: i32) -> Result<OrderGroup, KalshiError> {
+    pub async fn create_order_group(
+        &self,
+        contracts_limit: i32,
+    ) -> Result<OrderGroup, KalshiError> {
         let path = "/portfolio/order_groups/create";
         let body = CreateOrderGroupRequest { contracts_limit };
         self.signed_post(path, &body).await
@@ -809,7 +815,7 @@ impl<'a> Kalshi {
     ) -> Result<Vec<OrderQueuePosition>, KalshiError> {
         let path = "/portfolio/orders/queue_positions";
         let mut params = vec![];
-        
+
         // Add each order_id as a separate query parameter
         for id in order_ids {
             params.push(("order_ids".to_string(), id));
@@ -935,7 +941,10 @@ impl<'a> Kalshi {
     /// println!("Order is at position {} in queue", position.queue_position);
     /// ```
     ///
-    pub async fn get_order_queue_position(&self, order_id: &str) -> Result<OrderQueuePosition, KalshiError> {
+    pub async fn get_order_queue_position(
+        &self,
+        order_id: &str,
+    ) -> Result<OrderQueuePosition, KalshiError> {
         let path = format!("/portfolio/orders/{}/queue_position", order_id);
         self.signed_get(&path).await
     }
@@ -1316,7 +1325,9 @@ impl OrderCreationField {
     fn into_payload(self) -> CreateOrderPayload {
         CreateOrderPayload {
             action: self.action,
-            client_order_id: self.client_order_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+            client_order_id: self
+                .client_order_id
+                .unwrap_or_else(|| Uuid::new_v4().to_string()),
             count: self.count,
             side: self.side,
             ticker: self.ticker,
