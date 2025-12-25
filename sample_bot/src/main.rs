@@ -20,19 +20,22 @@ async fn main() {
         Ok(creds) => creds,
         Err(e) => {
             eprintln!("Error: {}", e);
-            eprintln!("Please set KALSHI_DEMO_API_KEY and KALSHI_DEMO_PEM_PATH environment variables");
+            eprintln!(
+                "Please set KALSHI_DEMO_API_KEY and KALSHI_DEMO_PEM_PATH environment variables"
+            );
             return;
         }
     };
 
     // Create authenticated Kalshi instance
-    let kalshi_instance = match Kalshi::new(kalshi::TradingEnvironment::DemoMode, &key_id, &pem_path).await {
-        Ok(k) => k,
-        Err(e) => {
-            eprintln!("Failed to authenticate: {:?}", e);
-            return;
-        }
-    };
+    let kalshi_instance =
+        match Kalshi::new(kalshi::TradingEnvironment::DemoMode, &key_id, &pem_path).await {
+            Ok(k) => k,
+            Err(e) => {
+                eprintln!("Failed to authenticate: {:?}", e);
+                return;
+            }
+        };
 
     // Example: Get a market
     let new_york_ticker = "HIGHNY-23NOV13-T51".to_string();
