@@ -249,10 +249,15 @@ impl KalshiWebSocket {
         let message = format!("{}{}{}", timestamp, method, path);
         let signature = self.sign_message(&message)?;
 
-        let auth_url = format!(
-            "{}?api-key={}&timestamp={}&signature={}",
-            self.url, self.key_id, timestamp, signature
-        );
+        // Build URL with properly encoded query parameters
+        let mut url = reqwest::Url::parse(&self.url)
+            .map_err(|e| KalshiError::InternalError(format!("Invalid WebSocket URL: {}", e)))?;
+        url.query_pairs_mut()
+            .append_pair("api-key", &self.key_id)
+            .append_pair("timestamp", &timestamp.to_string())
+            .append_pair("signature", &signature);
+
+        let auth_url = url.to_string();
 
         let (ws_stream, _response) = connect_async(&auth_url)
             .await
