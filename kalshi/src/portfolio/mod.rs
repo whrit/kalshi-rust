@@ -284,7 +284,8 @@ impl<'a> Kalshi {
 
     /// Retrieves a list of portfolio settlements from the Kalshi exchange.
     ///
-    /// This method fetches settlements in the user's portfolio, with options for pagination using limit and cursor.
+    /// This method fetches settlements in the user's portfolio, with options for filtering
+    /// by ticker, event ticker, timestamp range, and pagination using limit and cursor.
     /// A valid authentication token is required to access this information.
     /// If the user is not logged in or the token is missing, it returns an error.
     ///
@@ -292,6 +293,10 @@ impl<'a> Kalshi {
     ///
     /// * `limit` - An optional integer to limit the number of settlements returned.
     /// * `cursor` - An optional string for pagination cursor.
+    /// * `ticker` - An optional string to filter settlements by market ticker.
+    /// * `event_ticker` - An optional string to filter settlements by event ticker.
+    /// * `min_ts` - An optional minimum timestamp for settlement time.
+    /// * `max_ts` - An optional maximum timestamp for settlement time.
     ///
     /// # Returns
     ///
@@ -303,17 +308,25 @@ impl<'a> Kalshi {
     ///
     /// ```
     /// // Assuming `kalshi_instance` is an already authenticated instance of `Kalshi`
-    /// let settlements = kalshi_instance.get_settlements(None, None).await.unwrap();
+    /// let settlements = kalshi_instance.get_settlements(None, None, None, None, None, None).await.unwrap();
     /// ```
     pub async fn get_settlements(
         &self,
         limit: Option<i64>,
         cursor: Option<String>,
+        ticker: Option<String>,
+        event_ticker: Option<String>,
+        min_ts: Option<i64>,
+        max_ts: Option<i64>,
     ) -> Result<(Option<String>, Vec<Settlement>), KalshiError> {
         let mut params: Vec<(&str, String)> = Vec::with_capacity(6);
 
         add_param!(params, "limit", limit);
         add_param!(params, "cursor", cursor);
+        add_param!(params, "ticker", ticker);
+        add_param!(params, "event_ticker", event_ticker);
+        add_param!(params, "min_ts", min_ts);
+        add_param!(params, "max_ts", max_ts);
 
         let path = if params.is_empty() {
             format!("{}/settlements", PORTFOLIO_PATH)
@@ -459,6 +472,13 @@ impl<'a> Kalshi {
         sell_position_floor: Option<i32>,
         yes_price_dollars: Option<String>,
         no_price_dollars: Option<String>,
+        // NEW PARAMETERS for API parity:
+        time_in_force: Option<TimeInForce>,
+        post_only: Option<bool>,
+        reduce_only: Option<bool>,
+        self_trade_prevention_type: Option<SelfTradePreventionType>,
+        order_group_id: Option<String>,
+        cancel_order_on_pause: Option<bool>,
     ) -> Result<Order, KalshiError> {
         match input_type {
             OrderType::Limit => {
@@ -473,19 +493,19 @@ impl<'a> Kalshi {
                         "Cannot provide both no_price and no_price_dollars".to_string(),
                     ));
                 }
-                
+
                 // Check if any price is provided
-                let has_price = yes_price.is_some() 
-                    || no_price.is_some() 
-                    || yes_price_dollars.is_some() 
+                let has_price = yes_price.is_some()
+                    || no_price.is_some()
+                    || yes_price_dollars.is_some()
                     || no_price_dollars.is_some();
-                
+
                 if !has_price {
                     return Err(KalshiError::UserInputError(
                         "Must provide a price (yes_price, no_price, yes_price_dollars, or no_price_dollars)".to_string(),
                     ));
                 }
-                
+
                 // Check if both yes and no prices are provided
                 let has_yes = yes_price.is_some() || yes_price_dollars.is_some();
                 let has_no = no_price.is_some() || no_price_dollars.is_some();
@@ -504,19 +524,25 @@ impl<'a> Kalshi {
         };
 
         let order_payload = CreateOrderPayload {
-            action: action,
+            action,
             client_order_id: unwrapped_id,
-            count: count,
-            side: side,
-            ticker: ticker,
+            count,
+            side,
+            ticker,
             r#type: input_type,
-            buy_max_cost: buy_max_cost,
-            expiration_ts: expiration_ts,
-            yes_price: yes_price,
-            no_price: no_price,
-            sell_position_floor: sell_position_floor,
-            yes_price_dollars: yes_price_dollars,
-            no_price_dollars: no_price_dollars,
+            buy_max_cost,
+            expiration_ts,
+            yes_price,
+            no_price,
+            sell_position_floor,
+            yes_price_dollars,
+            no_price_dollars,
+            time_in_force,
+            post_only,
+            reduce_only,
+            self_trade_prevention_type,
+            order_group_id,
+            cancel_order_on_pause,
         };
 
         let path = format!("{}/orders", PORTFOLIO_PATH);
@@ -540,43 +566,10 @@ impl<'a> Kalshi {
             ));
         }
 
-        // Convert the user-supplied OrderCreationField into raw payloads -----------------
+        // Convert the user-supplied OrderCreationField into raw payloads
         let orders: Vec<CreateOrderPayload> = batch
             .into_iter()
-            .map(|field| {
-                // unpack the helper struct
-                let (
-                    action,
-                    client_order_id,
-                    count,
-                    side,
-                    ticker,
-                    input_type,
-                    buy_max_cost,
-                    expiration_ts,
-                    yes_price,
-                    no_price,
-                    sell_position_floor,
-                    yes_price_dollars,
-                    no_price_dollars,
-                ) = field.get_params();
-
-                CreateOrderPayload {
-                    action,
-                    client_order_id: client_order_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
-                    count,
-                    side,
-                    ticker,
-                    r#type: input_type,
-                    buy_max_cost,
-                    expiration_ts,
-                    yes_price,
-                    no_price,
-                    sell_position_floor,
-                    yes_price_dollars,
-                    no_price_dollars,
-                }
-            })
+            .map(|field| field.into_payload())
             .collect();
 
         let path = format!("{}/orders/batched", PORTFOLIO_PATH);
@@ -585,7 +578,7 @@ impl<'a> Kalshi {
         // NB: signed_post already injects auth headers & error mapping
         let response: BatchCreateOrdersResponse = self.signed_post(&path, &body).await?;
 
-        // Convert the wire format into Vec<Result<…>>
+        // Convert the wire format into Vec<Result<...>>
         let mut out = Vec::with_capacity(response.orders.len());
         for item in response.orders {
             match (item.order, item.error) {
@@ -827,43 +820,94 @@ impl<'a> Kalshi {
 
     /// Amends an existing order by modifying its price or quantity.
     ///
-    /// This is an alternative to decrease_order that allows more flexibility.
+    /// This method allows updating an order's price and/or count. At most one price
+    /// field (yes_price, no_price, yes_price_dollars, or no_price_dollars) can be provided.
     ///
     /// # Arguments
     ///
     /// * `order_id` - The order ID to amend.
-    /// * `new_price` - Optional new price in cents.
-    /// * `new_quantity` - Optional new quantity of contracts.
+    /// * `ticker` - Market ticker (required for validation).
+    /// * `side` - Side of the order (yes/no).
+    /// * `action` - Action of the order (buy/sell).
+    /// * `client_order_id` - Original client order ID.
+    /// * `updated_client_order_id` - New client order ID after amendment.
+    /// * `yes_price` - Optional new yes price in cents.
+    /// * `no_price` - Optional new no price in cents.
+    /// * `yes_price_dollars` - Optional new yes price in dollars ("0.5600").
+    /// * `no_price_dollars` - Optional new no price in dollars ("0.5600").
+    /// * `count` - Optional new quantity of contracts.
     ///
     /// # Returns
     ///
-    /// - `Ok(Order)`: The amended order on successful modification.
-    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    /// - `Ok(AmendOrderResponse)`: Contains both the old and new order on success.
+    /// - `Err(KalshiError)`: An error if validation fails or there is an issue with the request.
     ///
     /// # Example
     ///
     /// ```
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let amended_order = kalshi_instance.amend_order(
+    /// use kalshi::{Side, Action};
+    ///
+    /// let response = kalshi_instance.amend_order(
     ///     "order-uuid",
-    ///     Some(55),
-    ///     Some(50)
+    ///     "TEST-MARKET",
+    ///     Side::Yes,
+    ///     Action::Buy,
+    ///     "original-client-id",
+    ///     "updated-client-id",
+    ///     Some(55),  // yes_price
+    ///     None,      // no_price
+    ///     None,      // yes_price_dollars
+    ///     None,      // no_price_dollars
+    ///     Some(10),  // count
     /// ).await.unwrap();
     /// ```
     ///
     pub async fn amend_order(
         &self,
         order_id: &str,
-        new_price: Option<i32>,
-        new_quantity: Option<i32>,
-    ) -> Result<Order, KalshiError> {
-        let path = format!("/portfolio/orders/{}/amend", order_id);
+        ticker: &str,
+        side: Side,
+        action: Action,
+        client_order_id: &str,
+        updated_client_order_id: &str,
+        yes_price: Option<i32>,
+        no_price: Option<i32>,
+        yes_price_dollars: Option<String>,
+        no_price_dollars: Option<String>,
+        count: Option<i32>,
+    ) -> Result<AmendOrderResponse, KalshiError> {
+        // Validate: at most one price field can be provided
+        let price_count = [
+            yes_price.is_some(),
+            no_price.is_some(),
+            yes_price_dollars.is_some(),
+            no_price_dollars.is_some(),
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+
+        if price_count > 1 {
+            return Err(KalshiError::UserInputError(
+                "At most one of yes_price, no_price, yes_price_dollars, or no_price_dollars can be provided".to_string(),
+            ));
+        }
+
+        let path = format!("{}/orders/{}/amend", PORTFOLIO_PATH, order_id);
         let body = AmendOrderRequest {
-            new_price,
-            new_quantity,
+            ticker: ticker.to_string(),
+            side,
+            action,
+            client_order_id: client_order_id.to_string(),
+            updated_client_order_id: updated_client_order_id.to_string(),
+            yes_price,
+            no_price,
+            yes_price_dollars,
+            no_price_dollars,
+            count,
         };
-        let res: SingleOrderResponse = self.signed_post(&path, &body).await?;
-        Ok(res.order)
+        self.signed_post(&path, &body).await
     }
 
     /// Retrieves the queue position for a single order.
@@ -969,15 +1013,33 @@ struct CreateOrderPayload {
     side: Side,
     ticker: String,
     r#type: OrderType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     buy_max_cost: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     expiration_ts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     yes_price: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     no_price: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     sell_position_floor: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     yes_price_dollars: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     no_price_dollars: Option<String>,
+    // NEW FIELDS for API parity:
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_in_force: Option<TimeInForce>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    post_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reduce_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    self_trade_prevention_type: Option<SelfTradePreventionType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order_group_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cancel_order_on_pause: Option<bool>,
 }
 
 // PUBLIC STRUCTS
@@ -1226,41 +1288,45 @@ pub struct OrderCreationField {
     pub yes_price_dollars: Option<String>,
     /// Price of the 'No' option in dollars (e.g., "0.5000"). Optional.
     pub no_price_dollars: Option<String>,
+    // NEW FIELDS for API parity:
+    /// The time-in-force behavior for the order. Optional.
+    pub time_in_force: Option<TimeInForce>,
+    /// If true, the order will only be placed if it can be added to the book (no immediate fills). Optional.
+    pub post_only: Option<bool>,
+    /// If true, the order can only reduce an existing position. Optional.
+    pub reduce_only: Option<bool>,
+    /// Specifies how self-trades should be prevented. Optional.
+    pub self_trade_prevention_type: Option<SelfTradePreventionType>,
+    /// The ID of the order group this order belongs to. Optional.
+    pub order_group_id: Option<String>,
+    /// If true, the order will be canceled if the market is paused. Optional.
+    pub cancel_order_on_pause: Option<bool>,
 }
 
-impl OrderParams for OrderCreationField {
-    fn get_params(
-        self,
-    ) -> (
-        Action,
-        Option<String>,
-        i32,
-        Side,
-        String,
-        OrderType,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i32>,
-        Option<String>,
-        Option<String>,
-    ) {
-        (
-            self.action,
-            self.client_order_id,
-            self.count,
-            self.side,
-            self.ticker,
-            self.input_type,
-            self.buy_max_cost,
-            self.expiration_ts,
-            self.yes_price,
-            self.no_price,
-            self.sell_position_floor,
-            self.yes_price_dollars,
-            self.no_price_dollars,
-        )
+impl OrderCreationField {
+    /// Converts the OrderCreationField into a CreateOrderPayload for batch operations.
+    fn into_payload(self) -> CreateOrderPayload {
+        CreateOrderPayload {
+            action: self.action,
+            client_order_id: self.client_order_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+            count: self.count,
+            side: self.side,
+            ticker: self.ticker,
+            r#type: self.input_type,
+            buy_max_cost: self.buy_max_cost,
+            expiration_ts: self.expiration_ts,
+            yes_price: self.yes_price,
+            no_price: self.no_price,
+            sell_position_floor: self.sell_position_floor,
+            yes_price_dollars: self.yes_price_dollars,
+            no_price_dollars: self.no_price_dollars,
+            time_in_force: self.time_in_force,
+            post_only: self.post_only,
+            reduce_only: self.reduce_only,
+            self_trade_prevention_type: self.self_trade_prevention_type,
+            order_group_id: self.order_group_id,
+            cancel_order_on_pause: self.cancel_order_on_pause,
+        }
     }
 }
 
@@ -1338,64 +1404,33 @@ pub enum OrderType {
     Limit,
 }
 
-trait OrderParams {
-    fn get_params(
-        self,
-    ) -> (
-        Action,
-        Option<String>,
-        i32,
-        Side,
-        String,
-        OrderType,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i32>,
-        Option<String>,
-        Option<String>,
-    );
+/// Specifies the time-in-force behavior for an order.
+///
+/// This enum determines how long an order remains active before it is executed or canceled.
+///
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TimeInForce {
+    /// Fill the entire order immediately or cancel it entirely.
+    FillOrKill,
+    /// Keep the order active until it is executed or manually canceled.
+    GoodTillCanceled,
+    /// Fill as much as possible immediately and cancel the rest.
+    ImmediateOrCancel,
 }
 
-impl OrderParams
-    for (
-        Action,
-        Option<String>,
-        i32,
-        Side,
-        String,
-        OrderType,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i32>,
-        Option<String>,
-        Option<String>,
-    )
-{
-    fn get_params(
-        self,
-    ) -> (
-        Action,
-        Option<String>,
-        i32,
-        Side,
-        String,
-        OrderType,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<i32>,
-        Option<String>,
-        Option<String>,
-    ) {
-        (
-            self.0, self.1, self.2, self.3, self.4, self.5, self.6, self.7, self.8, self.9, self.10, self.11, self.12,
-        )
-    }
+/// Specifies the self-trade prevention behavior for an order.
+///
+/// This enum determines how the exchange handles situations where an order
+/// would trade against another order from the same user.
+///
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SelfTradePreventionType {
+    /// Cancel the incoming (taker) order when it would cross with a resting order from the same user.
+    TakerAtCross,
+    /// Cancel the resting (maker) order when it would cross with an incoming order from the same user.
+    Maker,
 }
 
 /// Payload for POST /portfolio/orders/batched
@@ -1488,8 +1523,30 @@ pub struct OrderQueuePosition {
 
 #[derive(Debug, Serialize)]
 struct AmendOrderRequest {
-    new_price: Option<i32>,
-    new_quantity: Option<i32>,
+    ticker: String,
+    side: Side,
+    action: Action,
+    client_order_id: String,
+    updated_client_order_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    yes_price: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    no_price: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    yes_price_dollars: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    no_price_dollars: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    count: Option<i32>,
+}
+
+/// Response from the amend_order endpoint, containing both the old and new order.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AmendOrderResponse {
+    /// The original order before amendment.
+    pub old_order: Order,
+    /// The new order after amendment.
+    pub order: Order,
 }
 
 #[cfg(test)]
