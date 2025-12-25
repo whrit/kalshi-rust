@@ -20,6 +20,10 @@ dependency.
 - Run with: `cargo test websocket::channels --lib`
 - Tests cover: Channel Display, requires_auth, serialization, deserialization
 
+✅ **Phase 5 Complete** - Testing and exports with 6 integration tests
+- Run with: `cargo test --test websocket_tests`
+- Tests cover: connect/disconnect, subscribe ticker, subscribe orderbook, unsubscribe, Channel Display, requires_auth
+
 ## Progress Tracking
 
 ### Phase 1: Critical Trading Features (HTTPS Fixes) - ✅ COMPLETE
@@ -61,6 +65,14 @@ dependency.
 | 4.6 Subscription Management | ✅ Done | Created subscription.rs with subscribe/unsubscribe/update methods |
 | 4.7 Stream Interface | ✅ Done | Added Stream trait impl for async message polling in connection.rs |
 | 4.8 Integration with Kalshi Struct | ✅ Done | Added websocket() factory and trading_env() to lib.rs |
+
+### Phase 5: Testing and Documentation - COMPLETE (tests only, docs deferred)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 5.1 WebSocket Tests | ✅ Done | Created websocket_tests.rs with 6 tests (connect, subscribe, unsubscribe, Channel traits) |
+| 5.2 Update lib.rs Exports | ✅ Done | All types exported via glob exports (TimeInForce, MveFilter, WebSocket types verified) |
+| 5.3 Documentation Generation | ⏳ Deferred | Holding off per user request |
 
 ---
 Phase 1: Critical Trading Features (HTTPS Fixes) - COMPLETE
