@@ -1,9 +1,12 @@
-use kalshi::{Kalshi, TradingEnvironment, KalshiError};
+#![allow(dead_code)]
+
+use kalshi::{Kalshi, KalshiError, TradingEnvironment};
 use std::env;
 use std::sync::Once;
 
 static INIT: Once = Once::new();
-static SKIP_MESSAGE_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static SKIP_MESSAGE_SHOWN: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Initialize test environment - loads environment variables
 pub fn init_test_env() {
@@ -11,7 +14,10 @@ pub fn init_test_env() {
         // Try to load from custom env file path first
         if let Ok(env_path) = std::env::var("KALSHI_ENV_FILE") {
             if let Err(e) = dotenv::from_path(&env_path) {
-                eprintln!("Warning: Failed to load env file from {}: {:?}", env_path, e);
+                eprintln!(
+                    "Warning: Failed to load env file from {}: {:?}",
+                    env_path, e
+                );
             }
         } else {
             // Fall back to default .env in current directory
@@ -32,18 +38,21 @@ impl TestAuth {
     pub fn from_env() -> Option<Self> {
         let key_id = env::var("KALSHI_DEMO_API_KEY").ok()?;
         let pem_path = env::var("KALSHI_DEMO_PEM_PATH").ok()?;
-        let environment = match env::var("KALSHI_TEST_ENV").unwrap_or_else(|_| "demo".to_string()).as_str() {
+        let environment = match env::var("KALSHI_TEST_ENV")
+            .unwrap_or_else(|_| "demo".to_string())
+            .as_str()
+        {
             "prod" => TradingEnvironment::ProdMode,
             "demo" | _ => TradingEnvironment::DemoMode,
         };
-        
+
         Some(TestAuth {
             key_id,
             pem_path,
             environment,
         })
     }
-    
+
     /// Create a Kalshi instance for testing
     pub async fn create_kalshi(&self) -> Result<Kalshi, KalshiError> {
         Kalshi::new(self.environment, &self.key_id, &self.pem_path).await
@@ -78,10 +87,8 @@ pub fn show_skip_message_once() {
     }
 }
 
-
-
 /// Function to create an authenticated test setup
-/// Usage: 
+/// Usage:
 /// ```
 /// #[tokio::test]
 /// async fn my_test() {
@@ -97,13 +104,13 @@ pub async fn setup_auth_test() -> Result<Kalshi, KalshiError> {
 /// Test utilities for common operations
 pub mod utils {
     use super::*;
-    
+
     /// Get a test market ticker that's likely to exist
     pub fn get_test_market_ticker() -> String {
         // Use a market that's likely to exist for testing
         "TEST-MARKET-2024".to_string()
     }
-    
+
     /// Create a minimal test order that's unlikely to execute
     pub async fn create_test_order(kalshi: &Kalshi) -> Result<kalshi::Order, KalshiError> {
         // Create an order with very low probability of execution for testing
@@ -115,12 +122,20 @@ pub mod utils {
                 kalshi::Side::Yes,
                 get_test_market_ticker(),
                 kalshi::OrderType::Limit,
-                None,
-                None,
-                None,
-                None,
-                Some(1), // Very low price
+                None,    // buy_max_cost
+                None,    // expiration_ts
+                Some(1), // yes_price (very low price)
+                None,    // no_price
+                None,    // sell_position_floor
+                None,    // yes_price_dollars
+                None,    // no_price_dollars
+                None,    // time_in_force
+                None,    // post_only
+                None,    // reduce_only
+                None,    // self_trade_prevention_type
+                None,    // order_group_id
+                None,    // cancel_order_on_pause
             )
             .await
     }
-} 
+}

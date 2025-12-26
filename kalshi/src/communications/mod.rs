@@ -1,8 +1,34 @@
 use super::Kalshi;
 use crate::kalshi_error::*;
+use crate::Side;
 use serde::{Deserialize, Serialize};
 
 impl Kalshi {
+    // ========== Task 2.3: get_communications_id() ==========
+
+    /// Retrieves the user's public communications ID.
+    ///
+    /// This ID is used to identify the user in communications with other traders.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(String)`: The user's communications ID on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let comm_id = kalshi_instance.get_communications_id().await.unwrap();
+    /// println!("Communications ID: {}", comm_id);
+    /// ```
+    ///
+    pub async fn get_communications_id(&self) -> Result<String, KalshiError> {
+        let path = "/communications/id";
+        let res: CommunicationsIdResponse = self.signed_get(path).await?;
+        Ok(res.communications_id)
+    }
+
     /// Retrieves a communication by ID.
     ///
     /// This method fetches a specific communication message or thread.
@@ -28,27 +54,74 @@ impl Kalshi {
         self.signed_get(&path).await
     }
 
-    /// Retrieves all RFQs (Requests for Quote) for the authenticated user.
+    // ========== Task 3.3: get_rfqs() with pagination ==========
+
+    /// Retrieves RFQs (Requests for Quote) with optional filtering and pagination.
     ///
-    /// This method lists all RFQs that the user has created or received.
+    /// This method lists RFQs that the user has created or received, with support
+    /// for filtering by various parameters and pagination.
+    ///
+    /// # Arguments
+    ///
+    /// * `cursor` - Pagination cursor from previous request.
+    /// * `event_ticker` - Filter by event ticker.
+    /// * `market_ticker` - Filter by market ticker.
+    /// * `limit` - Number of results per page (default 100, max 100).
+    /// * `status` - Filter by RFQ status.
+    /// * `creator_user_id` - Filter by creator user ID.
     ///
     /// # Returns
     ///
-    /// - `Ok(Vec<Rfq>)`: A vector of RFQs on successful retrieval.
+    /// - `Ok((Option<String>, Vec<Rfq>))`: A tuple containing the next cursor (if any) and a vector of RFQs.
     /// - `Err(KalshiError)`: An error if there is an issue with the request.
     ///
     /// # Example
     ///
     /// ```
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let rfqs = kalshi_instance.get_rfqs().await.unwrap();
+    /// let (cursor, rfqs) = kalshi_instance.get_rfqs(
+    ///     None,        // cursor
+    ///     None,        // event_ticker
+    ///     None,        // market_ticker
+    ///     Some(10),    // limit
+    ///     None,        // status
+    ///     None,        // creator_user_id
+    /// ).await.unwrap();
     /// ```
     ///
-    pub async fn get_rfqs(&self) -> Result<Vec<Rfq>, KalshiError> {
-        let path = "/communications/rfqs";
-        let res: RfqsResponse = self.signed_get(path).await?;
-        Ok(res.rfqs)
+    pub async fn get_rfqs(
+        &self,
+        cursor: Option<String>,
+        event_ticker: Option<String>,
+        market_ticker: Option<String>,
+        limit: Option<i32>,
+        status: Option<String>,
+        creator_user_id: Option<String>,
+    ) -> Result<(Option<String>, Vec<Rfq>), KalshiError> {
+        let mut params: Vec<(&str, String)> = Vec::with_capacity(6);
+        add_param!(params, "cursor", cursor);
+        add_param!(params, "event_ticker", event_ticker);
+        add_param!(params, "market_ticker", market_ticker);
+        add_param!(params, "limit", limit);
+        add_param!(params, "status", status);
+        add_param!(params, "creator_user_id", creator_user_id);
+
+        let path = if params.is_empty() {
+            "/communications/rfqs".to_string()
+        } else {
+            let qs = params
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&");
+            format!("/communications/rfqs?{}", qs)
+        };
+
+        let res: RfqsResponse = self.signed_get(&path).await?;
+        Ok((res.cursor, res.rfqs))
     }
+
+    // ========== Task 3.1: create_rfq() ==========
 
     /// Creates a new RFQ (Request for Quote).
     ///
@@ -56,41 +129,50 @@ impl Kalshi {
     ///
     /// # Arguments
     ///
-    /// * `ticker` - The market ticker to request a quote for.
-    /// * `quantity` - The desired quantity of contracts.
-    /// * `side` - The side of the trade ("yes" or "no").
-    /// * `message` - Optional message to include with the RFQ.
+    /// * `market_ticker` - The market ticker to request a quote for.
+    /// * `rest_remainder` - Whether to rest the remainder after execution.
+    /// * `contracts` - Number of contracts for the RFQ (optional).
+    /// * `target_cost_centi_cents` - Target cost in centi-cents (optional).
+    /// * `replace_existing` - Whether to delete existing RFQs (default: false).
+    /// * `subtrader_id` - Subtrader ID (FCM members only).
     ///
     /// # Returns
     ///
-    /// - `Ok(Rfq)`: The created RFQ on successful creation.
+    /// - `Ok(CreateRfqResponse)`: The created RFQ response containing the new RFQ ID.
     /// - `Err(KalshiError)`: An error if there is an issue with the request.
     ///
     /// # Example
     ///
     /// ```
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let rfq = kalshi_instance.create_rfq(
+    /// let response = kalshi_instance.create_rfq(
     ///     "MARKET-TICKER",
-    ///     100,
-    ///     "yes",
-    ///     Some("Looking for best price")
+    ///     false,
+    ///     Some(100),
+    ///     None,
+    ///     None,
+    ///     None,
     /// ).await.unwrap();
+    /// println!("Created RFQ with ID: {}", response.id);
     /// ```
     ///
     pub async fn create_rfq(
         &self,
-        ticker: &str,
-        quantity: i32,
-        side: &str,
-        message: Option<&str>,
-    ) -> Result<Rfq, KalshiError> {
+        market_ticker: &str,
+        rest_remainder: bool,
+        contracts: Option<i32>,
+        target_cost_centi_cents: Option<i64>,
+        replace_existing: Option<bool>,
+        subtrader_id: Option<String>,
+    ) -> Result<CreateRfqResponse, KalshiError> {
         let path = "/communications/rfqs";
         let body = CreateRfqRequest {
-            ticker: ticker.to_string(),
-            quantity,
-            side: side.to_string(),
-            message: message.map(|s| s.to_string()),
+            market_ticker: market_ticker.to_string(),
+            rest_remainder,
+            contracts,
+            target_cost_centi_cents,
+            replace_existing,
+            subtrader_id,
         };
         self.signed_post(path, &body).await
     }
@@ -147,27 +229,83 @@ impl Kalshi {
         Ok(())
     }
 
-    /// Retrieves all quotes for the authenticated user.
+    // ========== Task 3.3: get_quotes() with pagination ==========
+
+    /// Retrieves quotes with optional filtering and pagination.
     ///
-    /// This method lists all quotes that the user has created or received.
+    /// This method lists quotes that the user has created or received, with support
+    /// for filtering by various parameters and pagination.
+    ///
+    /// # Arguments
+    ///
+    /// * `cursor` - Pagination cursor from previous request.
+    /// * `event_ticker` - Filter by event ticker.
+    /// * `market_ticker` - Filter by market ticker.
+    /// * `limit` - Number of results per page (default 500, max 500).
+    /// * `status` - Filter by quote status.
+    /// * `quote_creator_user_id` - Filter by quote creator user ID.
+    /// * `rfq_creator_user_id` - Filter by RFQ creator user ID.
+    /// * `rfq_id` - Filter by RFQ ID.
     ///
     /// # Returns
     ///
-    /// - `Ok(Vec<Quote>)`: A vector of quotes on successful retrieval.
+    /// - `Ok((Option<String>, Vec<Quote>))`: A tuple containing the next cursor (if any) and a vector of quotes.
     /// - `Err(KalshiError)`: An error if there is an issue with the request.
     ///
     /// # Example
     ///
     /// ```
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let quotes = kalshi_instance.get_quotes().await.unwrap();
+    /// let (cursor, quotes) = kalshi_instance.get_quotes(
+    ///     None,        // cursor
+    ///     None,        // event_ticker
+    ///     None,        // market_ticker
+    ///     Some(10),    // limit
+    ///     None,        // status
+    ///     None,        // quote_creator_user_id
+    ///     None,        // rfq_creator_user_id
+    ///     None,        // rfq_id
+    /// ).await.unwrap();
     /// ```
     ///
-    pub async fn get_quotes(&self) -> Result<Vec<Quote>, KalshiError> {
-        let path = "/communications/quotes";
-        let res: QuotesResponse = self.signed_get(path).await?;
-        Ok(res.quotes)
+    #[allow(clippy::too_many_arguments)]
+    pub async fn get_quotes(
+        &self,
+        cursor: Option<String>,
+        event_ticker: Option<String>,
+        market_ticker: Option<String>,
+        limit: Option<i32>,
+        status: Option<String>,
+        quote_creator_user_id: Option<String>,
+        rfq_creator_user_id: Option<String>,
+        rfq_id: Option<String>,
+    ) -> Result<(Option<String>, Vec<Quote>), KalshiError> {
+        let mut params: Vec<(&str, String)> = Vec::with_capacity(8);
+        add_param!(params, "cursor", cursor);
+        add_param!(params, "event_ticker", event_ticker);
+        add_param!(params, "market_ticker", market_ticker);
+        add_param!(params, "limit", limit);
+        add_param!(params, "status", status);
+        add_param!(params, "quote_creator_user_id", quote_creator_user_id);
+        add_param!(params, "rfq_creator_user_id", rfq_creator_user_id);
+        add_param!(params, "rfq_id", rfq_id);
+
+        let path = if params.is_empty() {
+            "/communications/quotes".to_string()
+        } else {
+            let qs = params
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&");
+            format!("/communications/quotes?{}", qs)
+        };
+
+        let res: QuotesResponse = self.signed_get(&path).await?;
+        Ok((res.cursor, res.quotes))
     }
+
+    // ========== Task 3.2: create_quote() ==========
 
     /// Creates a new quote in response to an RFQ.
     ///
@@ -175,33 +313,42 @@ impl Kalshi {
     ///
     /// # Arguments
     ///
-    /// * `rfq_id` - The RFQ ID this quote is responding to.
-    /// * `price` - The quoted price in cents.
-    /// * `quantity` - The quoted quantity of contracts.
+    /// * `rfq_id` - The RFQ ID this quote responds to.
+    /// * `yes_bid` - Bid price for YES contracts in dollars ("0.5600" format).
+    /// * `no_bid` - Bid price for NO contracts in dollars ("0.5600" format).
+    /// * `rest_remainder` - Whether to rest the remainder after execution.
     ///
     /// # Returns
     ///
-    /// - `Ok(Quote)`: The created quote on successful creation.
+    /// - `Ok(CreateQuoteResponse)`: The created quote response containing the new quote ID.
     /// - `Err(KalshiError)`: An error if there is an issue with the request.
     ///
     /// # Example
     ///
     /// ```
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let quote = kalshi_instance.create_quote("rfq-123", 50, 100).await.unwrap();
+    /// let response = kalshi_instance.create_quote(
+    ///     "rfq-123",
+    ///     "0.5000",
+    ///     "0.5000",
+    ///     false,
+    /// ).await.unwrap();
+    /// println!("Created quote with ID: {}", response.id);
     /// ```
     ///
     pub async fn create_quote(
         &self,
         rfq_id: &str,
-        price: i32,
-        quantity: i32,
-    ) -> Result<Quote, KalshiError> {
+        yes_bid: &str,
+        no_bid: &str,
+        rest_remainder: bool,
+    ) -> Result<CreateQuoteResponse, KalshiError> {
         let path = "/communications/quotes";
         let body = CreateQuoteRequest {
             rfq_id: rfq_id.to_string(),
-            price,
-            quantity,
+            yes_bid: yes_bid.to_string(),
+            no_bid: no_bid.to_string(),
+            rest_remainder,
         };
         self.signed_post(path, &body).await
     }
@@ -258,6 +405,8 @@ impl Kalshi {
         Ok(())
     }
 
+    // ========== Task 3.4: accept_quote() with accepted_side ==========
+
     /// Accepts a quote.
     ///
     /// This method accepts a quote offer, which will execute the trade.
@@ -265,22 +414,31 @@ impl Kalshi {
     /// # Arguments
     ///
     /// * `quote_id` - The quote ID to accept.
+    /// * `accepted_side` - Which side to accept (Yes or No).
     ///
     /// # Returns
     ///
-    /// - `Ok(QuoteAccepted)`: The accepted quote details on successful acceptance.
+    /// - `Ok(())`: Success confirmation (API returns 204 No Content).
     /// - `Err(KalshiError)`: An error if there is an issue with the request.
     ///
     /// # Example
     ///
     /// ```
+    /// use kalshi::Side;
+    ///
     /// // Assuming `kalshi_instance` is an instance of `Kalshi`
-    /// let result = kalshi_instance.accept_quote("quote-123").await.unwrap();
+    /// kalshi_instance.accept_quote("quote-123", Side::Yes).await.unwrap();
     /// ```
     ///
-    pub async fn accept_quote(&self, quote_id: &str) -> Result<QuoteAccepted, KalshiError> {
+    pub async fn accept_quote(
+        &self,
+        quote_id: &str,
+        accepted_side: Side,
+    ) -> Result<(), KalshiError> {
         let path = format!("/communications/quotes/{}/accept", quote_id);
-        self.signed_put(&path, None::<&()>).await
+        let body = AcceptQuoteRequest { accepted_side };
+        let _: serde_json::Value = self.signed_put(&path, Some(&body)).await?;
+        Ok(())
     }
 
     /// Confirms a quote.
@@ -311,19 +469,36 @@ impl Kalshi {
 
 // -------- Request bodies --------
 
+#[derive(Debug, Deserialize)]
+struct CommunicationsIdResponse {
+    communications_id: String,
+}
+
 #[derive(Debug, Serialize)]
 struct CreateRfqRequest {
-    ticker: String,
-    quantity: i32,
-    side: String,
-    message: Option<String>,
+    market_ticker: String,
+    rest_remainder: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contracts: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_cost_centi_cents: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replace_existing: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subtrader_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct CreateQuoteRequest {
     rfq_id: String,
-    price: i32,
-    quantity: i32,
+    yes_bid: String,
+    no_bid: String,
+    rest_remainder: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct AcceptQuoteRequest {
+    accepted_side: Side,
 }
 
 // -------- Response wrappers --------
@@ -331,6 +506,7 @@ struct CreateQuoteRequest {
 #[derive(Debug, Deserialize)]
 struct RfqsResponse {
     rfqs: Vec<Rfq>,
+    cursor: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -344,6 +520,7 @@ struct DeleteRfqResponse {}
 #[derive(Debug, Deserialize)]
 struct QuotesResponse {
     quotes: Vec<Quote>,
+    cursor: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -355,6 +532,20 @@ struct QuoteResponse {
 struct DeleteQuoteResponse {}
 
 // -------- Public models --------
+
+/// Response from creating a new RFQ.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CreateRfqResponse {
+    /// The ID of the newly created RFQ.
+    pub id: String,
+}
+
+/// Response from creating a new quote.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CreateQuoteResponse {
+    /// The ID of the newly created quote.
+    pub id: String,
+}
 
 /// Represents a communication message or thread.
 #[derive(Debug, Deserialize, Serialize)]
@@ -379,19 +570,30 @@ pub struct Rfq {
     /// The RFQ ID.
     pub id: String,
     /// The market ticker requested.
-    pub ticker: String,
+    #[serde(alias = "ticker")]
+    pub market_ticker: Option<String>,
     /// The desired quantity.
-    pub quantity: i32,
+    #[serde(default)]
+    pub contracts: Option<i32>,
     /// The side of the trade ("yes" or "no").
-    pub side: String,
+    pub side: Option<String>,
     /// Optional message with the RFQ.
     pub message: Option<String>,
     /// The status of the RFQ.
-    pub status: String,
+    pub status: Option<String>,
     /// Timestamp when created.
-    pub created_time: String,
+    pub created_time: Option<String>,
     /// Timestamp when expires.
     pub expires_time: Option<String>,
+    /// Whether to rest the remainder.
+    pub rest_remainder: Option<bool>,
+    /// Target cost in centi-cents.
+    pub target_cost_centi_cents: Option<i64>,
+    /// Creator user ID.
+    pub creator_user_id: Option<String>,
+    /// Additional fields that may be returned by the API.
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// Represents a quote offer.
@@ -400,28 +602,30 @@ pub struct Quote {
     /// The quote ID.
     pub id: String,
     /// The RFQ this quote responds to.
-    pub rfq_id: String,
-    /// The quoted price in cents.
-    pub price: i32,
-    /// The quoted quantity.
-    pub quantity: i32,
+    pub rfq_id: Option<String>,
+    /// The quoted yes bid price in dollars.
+    pub yes_bid: Option<String>,
+    /// The quoted no bid price in dollars.
+    pub no_bid: Option<String>,
+    /// The quoted price in cents (legacy).
+    pub price: Option<i32>,
+    /// The quoted quantity (legacy).
+    pub quantity: Option<i32>,
     /// The status of the quote.
-    pub status: String,
+    pub status: Option<String>,
     /// Timestamp when created.
-    pub created_time: String,
+    pub created_time: Option<String>,
     /// Timestamp when expires.
     pub expires_time: Option<String>,
-}
-
-/// Represents an accepted quote.
-#[derive(Debug, Deserialize, Serialize)]
-pub struct QuoteAccepted {
-    /// The quote ID.
-    pub quote_id: String,
-    /// The status after acceptance.
-    pub status: String,
-    /// The order ID if trade was executed.
-    pub order_id: Option<String>,
+    /// Whether to rest the remainder.
+    pub rest_remainder: Option<bool>,
+    /// Quote creator user ID.
+    pub quote_creator_user_id: Option<String>,
+    /// RFQ creator user ID.
+    pub rfq_creator_user_id: Option<String>,
+    /// Additional fields that may be returned by the API.
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// Represents a confirmed quote.
@@ -434,4 +638,3 @@ pub struct QuoteConfirmed {
     /// The fill ID if trade was completed.
     pub fill_id: Option<String>,
 }
-

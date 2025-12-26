@@ -34,6 +34,7 @@ impl Kalshi {
     /// ).await.unwrap();
     /// ```
     ///
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_events(
         &self,
         limit: Option<i64>,
@@ -122,7 +123,10 @@ impl Kalshi {
         end_ts: Option<i64>,
         period_interval: Option<String>,
     ) -> Result<Vec<Candlestick>, KalshiError> {
-        let path = format!("/series/{}/events/{}/candlesticks", series_ticker, event_ticker);
+        let path = format!(
+            "/series/{}/events/{}/candlesticks",
+            series_ticker, event_ticker
+        );
         let mut params = vec![];
         add_param!(params, "start_ts", start_ts);
         add_param!(params, "end_ts", end_ts);
@@ -155,7 +159,10 @@ impl Kalshi {
     /// let metadata = kalshi_instance.get_event_metadata("EVENT-TICKER").await.unwrap();
     /// ```
     ///
-    pub async fn get_event_metadata(&self, event_ticker: &str) -> Result<EventMetadata, KalshiError> {
+    pub async fn get_event_metadata(
+        &self,
+        event_ticker: &str,
+    ) -> Result<EventMetadata, KalshiError> {
         let path = format!("/events/{}/metadata", event_ticker);
         self.signed_get(&path).await
     }
@@ -188,6 +195,67 @@ impl Kalshi {
         let path = format!("/events/{}/forecast_percentile_history", event_ticker);
         self.signed_get(&path).await
     }
+
+    /// Retrieves multivariate events (combo markets) with optional filtering.
+    ///
+    /// Multivariate events are special event types that allow trading on
+    /// combinations of outcomes across multiple markets.
+    ///
+    /// # Arguments
+    ///
+    /// * `limit` - Number of results per page (default 100, max 200)
+    /// * `cursor` - Pagination cursor for fetching subsequent pages
+    /// * `series_ticker` - Filter by series ticker (cannot use with collection_ticker)
+    /// * `collection_ticker` - Filter by collection ticker (cannot use with series_ticker)
+    /// * `with_nested_markets` - Include nested markets in response (default false)
+    ///
+    /// # Returns
+    ///
+    /// - `Ok((Option<String>, Vec<Event>))`: A tuple containing an optional pagination cursor
+    ///   and a vector of `Event` objects on successful retrieval.
+    /// - `Err(KalshiError)`: An error if there is an issue with the request.
+    ///
+    /// # Errors
+    ///
+    /// Returns `KalshiError::UserInputError` if both `series_ticker` and `collection_ticker`
+    /// are provided, as these filters are mutually exclusive.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// // Assuming `kalshi_instance` is an instance of `Kalshi`
+    /// let (cursor, events) = kalshi_instance.get_multivariate_events(
+    ///     Some(10), None, None, None, Some(true)
+    /// ).await.unwrap();
+    /// ```
+    ///
+    pub async fn get_multivariate_events(
+        &self,
+        limit: Option<i32>,
+        cursor: Option<String>,
+        series_ticker: Option<String>,
+        collection_ticker: Option<String>,
+        with_nested_markets: Option<bool>,
+    ) -> Result<(Option<String>, Vec<Event>), KalshiError> {
+        // Validate: cannot use both series_ticker and collection_ticker
+        if series_ticker.is_some() && collection_ticker.is_some() {
+            return Err(KalshiError::UserInputError(
+                "Cannot use both series_ticker and collection_ticker - these filters are mutually exclusive".to_string()
+            ));
+        }
+
+        let mut params: Vec<(&str, String)> = Vec::with_capacity(5);
+        add_param!(params, "limit", limit);
+        add_param!(params, "cursor", cursor);
+        add_param!(params, "series_ticker", series_ticker);
+        add_param!(params, "collection_ticker", collection_ticker);
+        add_param!(params, "with_nested_markets", with_nested_markets);
+
+        let url = format!("{}/events/multivariate", self.base_url);
+        let final_url = reqwest::Url::parse_with_params(&url, &params)?;
+        let res: EventListResponse = self.client.get(final_url).send().await?.json().await?;
+        Ok((res.cursor, res.events))
+    }
 }
 
 // -------- Response wrappers --------
@@ -199,6 +267,7 @@ struct EventListResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Used by serde for deserialization
 struct SingleEventResponse {
     event: Event,
 }
@@ -250,4 +319,3 @@ pub struct ForecastDataPoint {
     /// Forecast percentile values.
     pub percentiles: std::collections::HashMap<String, f64>,
 }
-

@@ -4,77 +4,96 @@ use std::env;
 
 extern crate kalshi;
 
-enum APIType {
-    Live,
-    Demo,
+fn retrieve_credentials() -> Result<(String, String), String> {
+    let key_id = env::var("KALSHI_DEMO_API_KEY")
+        .map_err(|_| "KALSHI_DEMO_API_KEY environment variable not set")?;
+    let pem_path = env::var("KALSHI_DEMO_PEM_PATH")
+        .map_err(|_| "KALSHI_DEMO_PEM_PATH environment variable not set")?;
+    Ok((key_id, pem_path))
 }
 
-fn retreive_credentials(setting: APIType) -> Result<(String, String), std::io::Error> {
-    let mut password: String = "dummy".to_string();
-    let mut username: String = "dummy".to_string();
-    match setting {
-        APIType::Live => {
-            if let Ok(key) = env::var("LIVE_PASSWORD") {
-                println!("got password");
-                password = key;
-            }
-            if let Ok(user) = env::var("LIVE_USER_NAME") {
-                println!("got user");
-                username = user;
-            }
-        }
-
-        APIType::Demo => {
-            if let Ok(key) = env::var("DEMO_PASSWORD") {
-                println!("got password");
-                password = key;
-            }
-            if let Ok(user) = env::var("DEMO_USER_NAME") {
-                println!("got user");
-                username = user;
-            }
-        }
-    }
-    Ok((username, password))
-}
 #[tokio::main]
 async fn main() {
     dotenv().ok();
 
-    let (username, password) = retreive_credentials(APIType::Demo).unwrap() ;
+    let (key_id, pem_path) = match retrieve_credentials() {
+        Ok(creds) => creds,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            eprintln!(
+                "Please set KALSHI_DEMO_API_KEY and KALSHI_DEMO_PEM_PATH environment variables"
+            );
+            return;
+        }
+    };
 
-    let mut kalshi_instance = Kalshi::new(kalshi::TradingEnvironment::DemoMode);
+    // Create authenticated Kalshi instance
+    let kalshi_instance =
+        match Kalshi::new(kalshi::TradingEnvironment::DemoMode, &key_id, &pem_path).await {
+            Ok(k) => k,
+            Err(e) => {
+                eprintln!("Failed to authenticate: {:?}", e);
+                return;
+            }
+        };
 
-    kalshi_instance.login(&username, &password).await;
-
+    // Example: Get a market
     let new_york_ticker = "HIGHNY-23NOV13-T51".to_string();
 
-    let nytemp_market_data = kalshi_instance.get_single_market(&new_york_ticker).await.unwrap();
-    
-    let nytemp_market_orderbook = kalshi_instance.get_market_orderbook(&new_york_ticker, Some(10)).await.unwrap();
+    let _nytemp_market_data = match kalshi_instance.get_market(&new_york_ticker).await {
+        Ok(market) => {
+            println!("Market data: {:?}", market);
+            market
+        }
+        Err(e) => {
+            eprintln!("Failed to get market data: {:?}", e);
+            return;
+        }
+    };
 
-
-      let bought_order = kalshi_instance
-        .create_order(
-            kalshi::Action::Buy,
-            None,
-            1,
-            kalshi::Side::Yes,
-            new_york_ticker,
-            kalshi::OrderType::Limit,
-            None,
-            None,
-            None,
-            None,
-            Some(5),
-        )
+    let _nytemp_market_orderbook = match kalshi_instance
+        .get_orderbook(&new_york_ticker, Some(10))
         .await
-        .unwrap();
+    {
+        Ok(orderbook) => {
+            println!("Orderbook: {:?}", orderbook);
+            orderbook
+        }
+        Err(e) => {
+            eprintln!("Failed to get orderbook: {:?}", e);
+            return;
+        }
+    };
 
-    let ny_order_id = bought_order.order_id.clone();
-    
-    let cancelled_order = kalshi_instance.cancel_order(&ny_order_id).await.unwrap();
-    println!("{:?}", cancelled_order);
+    // Example: Create and cancel an order (commented out to prevent accidental trading)
+    // let bought_order = kalshi_instance
+    //     .create_order(
+    //         kalshi::Action::Buy,
+    //         None,
+    //         1,
+    //         kalshi::Side::Yes,
+    //         new_york_ticker,
+    //         kalshi::OrderType::Limit,
+    //         None,  // buy_max_cost
+    //         None,  // expiration_ts
+    //         Some(5), // yes_price (5 cents)
+    //         None,  // no_price
+    //         None,  // sell_position_floor
+    //         None,  // yes_price_dollars
+    //         None,  // no_price_dollars
+    //         None,  // time_in_force
+    //         None,  // post_only
+    //         None,  // reduce_only
+    //         None,  // self_trade_prevention_type
+    //         None,  // order_group_id
+    //         None,  // cancel_order_on_pause
+    //     )
+    //     .await
+    //     .unwrap();
+    //
+    // let ny_order_id = bought_order.order_id.clone();
+    // let cancelled_order = kalshi_instance.cancel_order(&ny_order_id).await.unwrap();
+    // println!("{:?}", cancelled_order);
 
-    
+    println!("Sample bot completed successfully!");
 }

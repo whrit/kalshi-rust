@@ -1,3 +1,10 @@
 /target/
 /.vscode/
 */.DS_Store
+
+.env
+.env.prod
+
+private.pem
+private-prod.pem
+private-demo.pem

@@ -163,4 +163,3 @@ pub struct ApiKeySecret {
     /// The API key secret.
     pub secret: String,
 }
-

@@ -1,3 +1,4 @@
+use base64::Engine;
 use chrono::Utc;
 use openssl::{
     hash::MessageDigest,
@@ -5,13 +6,11 @@ use openssl::{
     sign::{RsaPssSaltlen, Signer},
 };
 use reqwest::header::{HeaderMap, HeaderValue};
-use base64::Engine;
 
 use crate::kalshi_error::KalshiError;
 use crate::Kalshi; // struct defined in lib.rs
 
 impl Kalshi {
-
     /// “Logout” for the key-based scheme – just delete the key material.
     pub async fn logout(&self) -> Result<(), KalshiError> {
         // TODO: implement logout
@@ -45,7 +44,10 @@ impl Kalshi {
         self.signed_request::<(), T>("DELETE", path, None).await
     }
 
-    pub(crate) async fn signed_delete_with_body<B: serde::Serialize, T: serde::de::DeserializeOwned>(
+    pub(crate) async fn signed_delete_with_body<
+        B: serde::Serialize,
+        T: serde::de::DeserializeOwned,
+    >(
         &self,
         path: &str,
         body: &B,
@@ -71,7 +73,7 @@ impl Kalshi {
         let pkey = &self.private_key;
 
         let ts_ms = Utc::now().timestamp_millis();
-        
+
         // Remove query parameters from path (like Python code does)
         let path_without_query = path.split('?').next().unwrap_or(path);
         let message = format!("{ts_ms}{method}/trade-api/v2{path_without_query}");
@@ -104,10 +106,30 @@ impl Kalshi {
             builder.json(b).send().await?
         } else {
             builder.send().await?
+        };
+
+        // Check status and provide detailed error messages for authentication failures
+        let status = resp.status();
+        if !status.is_success() {
+            let body_text = resp.text().await.unwrap_or_default();
+            if status.as_u16() == 401 {
+                return Err(KalshiError::Auth(format!(
+                    "Authentication failed (401): {}. Check your API key and ensure the private key matches.",
+                    body_text
+                )));
+            } else if status.is_client_error() {
+                return Err(KalshiError::UserInputError(format!(
+                    "Request failed with status {}: {}",
+                    status, body_text
+                )));
+            } else {
+                return Err(KalshiError::InternalError(format!(
+                    "Server error {}: {}",
+                    status, body_text
+                )));
+            }
         }
-        .error_for_status()?;
 
         Ok(resp.json::<T>().await?)
     }
-
 }

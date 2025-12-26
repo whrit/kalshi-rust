@@ -86,4 +86,3 @@ pub struct FcmPosition {
     #[serde(flatten)]
     pub details: std::collections::HashMap<String, serde_json::Value>,
 }
-

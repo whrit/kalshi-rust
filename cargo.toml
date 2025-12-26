@@ -1,2 +1,3 @@
 [workspace]
 members = ["kalshi", "sample_bot"]
+resolver = "2"

@@ -10,10 +10,10 @@
 //!
 //! ## The Kalshi Struct
 //!
-//! The [Kalshi](Kalshi) struct is the central component of this crate.
+//! The [`Kalshi`] struct is the central component of this crate.
 //! All authentication, order routing, market requests, and position snapshots are handled through the struct and its methods.
 //!
-//! For more details, see [Kalshi](Kalshi).
+//! For more details, see [`Kalshi`].
 //!
 //! For a quick tutorial / beginners guide, jump [here](#quick-start-guide).
 //!
@@ -36,7 +36,7 @@
 //! Initialize the Kalshi Struct with key-based authentication:
 //! - **IMPORTANT**:  The authentication is handled automatically when creating a new instance.
 //! - Store your key ID and private key file securely, an implementation of extracting these from local environmental variables
-//! is available [here](https://github.com/dpeachpeach/kalshi-rust/blob/main/sample_bot/src/main.rs#L12)
+//!   is available [here](https://github.com/dpeachpeach/kalshi-rust/blob/main/sample_bot/src/main.rs#L12)
 //! ```
 //! use kalshi::Kalshi;
 //! use kalshi::TradingEnvironment;
@@ -70,7 +70,7 @@
 //! ```
 //!
 //! Refer to the rest of the documentation for details on all other methods!
-//! 
+//!
 //! ## Returned Values
 //!
 //! Whenever a user makes a method call using the kalshi struct, data is typically returned
@@ -111,8 +111,8 @@
 
 #[macro_use]
 mod utils;
-mod auth;
 mod api_keys;
+mod auth;
 mod collection;
 mod communications;
 mod events;
@@ -126,6 +126,7 @@ mod milestone;
 mod portfolio;
 mod search;
 mod structured_targets;
+mod websocket;
 
 // pub use auth::*;  // Unused import
 pub use api_keys::*;
@@ -142,9 +143,9 @@ pub use milestone::*;
 pub use portfolio::*;
 pub use search::*;
 pub use structured_targets::*;
+pub use websocket::*;
 
 // imports
-use reqwest;
 use openssl::pkey::{PKey, Private};
 use std::fs;
 use std::path::Path;
@@ -200,32 +201,36 @@ impl Kalshi {
     /// let kalshi = Kalshi::new(TradingEnvironment::ProdMode, "your-key-id", "path/to/private.pem").await?;
     /// ```
     ///
-    pub async fn new(trading_env: TradingEnvironment, key_id: &str, pem_path: &str) -> Result<Self, crate::kalshi_error::KalshiError> {
+    pub async fn new(
+        trading_env: TradingEnvironment,
+        key_id: &str,
+        pem_path: &str,
+    ) -> Result<Self, crate::kalshi_error::KalshiError> {
         println!("Loading private key from: {}", pem_path);
-        
+
         // Load the private key first
         let pem = match fs::read(Path::new(pem_path)) {
             Ok(pem) => {
                 println!("Successfully read private key file");
                 pem
-            },
+            }
             Err(e) => {
                 eprintln!("Failed to read private key file: {:?}", e);
                 return Err(e.into());
             }
         };
-        
+
         let private_key = match PKey::private_key_from_pem(&pem) {
             Ok(key) => {
                 println!("Successfully parsed private key");
                 key
-            },
+            }
             Err(e) => {
                 eprintln!("Failed to parse private key: {:?}", e);
                 return Err(e.into());
             }
         };
-        
+
         let base_url = utils::build_base_url(trading_env).to_string();
         let kalshi = Self {
             base_url,
@@ -233,19 +238,36 @@ impl Kalshi {
             private_key,
             client: reqwest::Client::new(),
         };
-        
-        // Verify authentication by hitting the exchange status endpoint
-        println!("Verifying authentication with exchange status endpoint...");
-        match kalshi.get_exchange_status().await {
-            Ok(status) => {
-                println!("Authentication successful! Exchange status: {:?}", status);
+
+        // Verify authentication by hitting an authenticated endpoint (balance)
+        println!("Verifying authentication with balance endpoint...");
+        match kalshi.get_balance().await {
+            Ok(balance) => {
+                println!(
+                    "Authentication successful! Account balance: {} cents",
+                    balance
+                );
                 Ok(kalshi)
-            },
+            }
             Err(e) => {
                 eprintln!("Authentication failed: {:?}", e);
                 eprintln!("Please check your API key and private key file");
                 Err(e)
             }
+        }
+    }
+
+    /// Creates a new WebSocket client using the same credentials.
+    pub fn websocket(&self) -> websocket::KalshiWebSocket {
+        websocket::KalshiWebSocket::new(self.trading_env(), &self.key_id, self.private_key.clone())
+    }
+
+    /// Returns the current trading environment.
+    pub fn trading_env(&self) -> TradingEnvironment {
+        if self.base_url.contains("demo") {
+            TradingEnvironment::DemoMode
+        } else {
+            TradingEnvironment::ProdMode
         }
     }
 }
