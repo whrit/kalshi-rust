@@ -2,7 +2,7 @@
 name = "kalshi-rust"
 version = "1.0.0"
 authors = ["Whrit <beckettwhrit@gmail.com>"]
-edition = "2025"
+edition = "2021"
 rust-version = "1.91.0"
 description = """An async Rust wrapper for the Kalshi trading API with full HTTPS
 and WebSocket support for building prediction market trading bots.
