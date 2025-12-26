@@ -1,8 +1,8 @@
 use dotenv::dotenv;
-use kalshi::Kalshi;
+use kalshi_rust::Kalshi;
 use std::env;
 
-extern crate kalshi;
+extern crate kalshi_rust;
 
 fn retrieve_credentials() -> Result<(String, String), String> {
     let key_id = env::var("KALSHI_DEMO_API_KEY")
@@ -29,7 +29,7 @@ async fn main() {
 
     // Create authenticated Kalshi instance
     let kalshi_instance =
-        match Kalshi::new(kalshi::TradingEnvironment::DemoMode, &key_id, &pem_path).await {
+        match Kalshi::new(kalshi_rust::TradingEnvironment::DemoMode, &key_id, &pem_path).await {
             Ok(k) => k,
             Err(e) => {
                 eprintln!("Failed to authenticate: {:?}", e);
@@ -68,12 +68,12 @@ async fn main() {
     // Example: Create and cancel an order (commented out to prevent accidental trading)
     // let bought_order = kalshi_instance
     //     .create_order(
-    //         kalshi::Action::Buy,
+    //         kalshi_rust::Action::Buy,
     //         None,
     //         1,
-    //         kalshi::Side::Yes,
+    //         kalshi_rust::Side::Yes,
     //         new_york_ticker,
-    //         kalshi::OrderType::Limit,
+    //         kalshi_rust::OrderType::Limit,
     //         None,  // buy_max_cost
     //         None,  // expiration_ts
     //         Some(5), // yes_price (5 cents)

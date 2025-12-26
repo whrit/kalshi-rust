@@ -1,20 +1,20 @@
 [package]
-name = "kalshi"
-version = "0.9.0"
-authors = ["David Petre <david.petre31@gmail.com>"]
-edition = "2021"
-rust-version = "1.72"
-description = """An HTTPS and Websocket wrapper that allows users to write 
-trading bots for the Kalshi events trading platform.
+name = "kalshi-rust"
+version = "1.0.0"
+authors = ["Whrit <beckettwhrit@gmail.com>"]
+edition = "2025"
+rust-version = "1.91.0"
+description = """An async Rust wrapper for the Kalshi trading API with full HTTPS
+and WebSocket support for building prediction market trading bots.
 """
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/dpeachpeach/kalshi-rust"
-keywords = ["finance", "trading", "kalshi", "bots"]
+repository = "https://github.com/whrit/kalshi-rust"
+keywords = ["finance", "trading", "kalshi", "bots", "async"]
 readme = "README.md"
 
 [lib]
 # We would like to eventually turn this on, but the doctests require some clean-up.
-# See https://github.com/dpeachpeach/kalshi-rust/issues/7
+# See https://github.com/whrit/kalshi-rust/issues/7
 doctest = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
